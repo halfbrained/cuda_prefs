@@ -1,13 +1,13 @@
 [info]
-title=Options Editor
+title=Preferences
 desc=View and change options from user.json
 type=cudatext-plugin
-subdir=cuda_options_editor
+subdir=cuda_prefs
 homepage=https://github.com/kvichans/cuda_options_editor
-api=1.0.237
+api=1.0.388
 
 [item10]
 section=commands
-caption=Options Editor...
+caption=Preferences...
 method=dlg_cuda_options
 ;menu=0
