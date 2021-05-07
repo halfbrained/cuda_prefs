@@ -819,7 +819,7 @@ class OptEdD:
         from .dlg import DialogMK2
         opt_man = OptionsMan(self.opts_defn, self.chp_tree, self.on_apply_value)
         # to access from Console:  xxcuda_options_editor_my._dbg_opted.dlg
-        self.dlg = DialogMK2(opt_man)
+        self.dlg = DialogMK2(opt_man, title, subset=self.subset, how=self.how)
         self.dlg.show()
         return
 
@@ -2160,7 +2160,6 @@ class OptionsMan:
     def set_opt(self, name, scope, val, lexer=None, apply_=True):
         res = self._on_apply_value(
                 'set', scope, name, val, lexer=lexer, apply_=apply_)
-        #print(f'\nset opt resuilt: {res}\n')
         print(f'NOTE: set opt: {name, val, scope}')
 
     def reset_opt(self, name, scope, lexer=None, apply_=True):
@@ -2246,6 +2245,9 @@ class OptionsMan:
 
     def get_scope_value(self, name, scope, default=None):
         opt = self.get_opt(name)
+        if not opt:
+            return default
+
         val = self.get_opt_scope_value(opt, scope, is_ui=False)
         return val  if val is not None else  default
 
@@ -2253,6 +2255,9 @@ class OptionsMan:
     def get_opt_scope_value(cls, opt, scope, is_ui):
         """ if is_ui==False -- result can be None
         """
+        if not opt:
+            return None
+
         if scope == 'u': # user
             return opt['juvl']  if is_ui else  opt.get('uval')
         elif scope == 'l': # lexer
@@ -2264,6 +2269,9 @@ class OptionsMan:
 
     @classmethod
     def get_opt_active_value(cls, opt, is_ui, with_scope=False):
+        if not opt:
+            return None
+
         override_str = opt['!']
         if override_str == '': # default
             res = opt['jdf']  if is_ui else  opt['def']
@@ -2284,21 +2292,20 @@ class OptionsMan:
 
         return (scope, res)  if with_scope else  res
 
-
 class OptionFilter:
     @classmethod
     def opt_filter(cls, opts_defn, filter_str):
         if not filter_str:
             return opts_defn[:]
 
-        print(f' >>>filter: {filter_str, len(opts_defn)}')
+        #print(f' >>>filter: {filter_str, len(opts_defn)}')
 
         filter_str, chapters = cls._get_chapter_filter(filter_str)
-        print(f' >>>    chp: {filter_str, chapters}')
+        #print(f' >>>    chp: {filter_str, chapters}')
         opts_defn = cls.chapter_filter(chapters, opts_defn)
-        print(f' >>>    chp filted len: {len(opts_defn)}')
+        #print(f' >>>    chp filted len: {len(opts_defn)}')
         opts_defn = cls.opt_text_filter(filter_str, opts_defn)
-        print(f' >>>    txt filted len: {len(opts_defn)}')
+        #print(f' >>>    txt filted len: {len(opts_defn)}')
         return opts_defn
 
     @classmethod

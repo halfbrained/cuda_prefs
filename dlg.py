@@ -32,6 +32,10 @@ import time
 * focus to filter on filter
 * <Escape> in filter to unfilter and hide filter
 * better way to get option value+scoped
+* options subsets
+* opted 3d-party api
+* test subset options
+* test loading opted's state
 
 #TODO:
 * list changes in dlg-statusbar + hover popup
@@ -53,6 +57,8 @@ file:///mnt/H/cuda/__FM/data/themes/cobalt.cuda-theme-ui
 _   = get_translation(__file__)  # I18N
 
 
+TITLE_DEFAULT = 'CudaText Preferences'
+
 OptChange = namedtuple('OptChange', 'name scope value lexer old_value')
 
 fn_icons = {
@@ -66,10 +72,16 @@ STATE_KEY_TREE_W = 'tree_w'
 STATE_KEY_DESCR_MEMO_H = 'descr_memo_h'
 STATE_KEY_FILTER_STR = 'filter_str'
 STATE_KEY_FILTER_HIST = 'filter_history'
-STATE_KEY_FILTER_VISIBLE = 'filter_visible'
+STATE_KEY_FILTER_VISIBLE = 'filter_visible' #TODO remove
 STATE_KEY_COL_CFG = 'columns'
 STATE_KEY_SORT_COL = 'sort_column'
 STATE_KEY_SEL_OPT = 'selected_option'
+
+SUBSET_KEYS = [
+    STATE_KEY_FILTER_STR,
+    STATE_KEY_FILTER_HIST,
+    STATE_KEY_SEL_OPT,
+]
 
 
 IS_DBG = False
@@ -180,6 +192,7 @@ def ignore_edit(h, ed_):
 
 def map_option_value(opt, val=None, caption=None):
     """ for map options - returns caption for provided 'val'ue, or value for provided 'caption'
+        "val" -- 0;  "caption" -- (0) don't activate"
     """
     frm = opt['frm']
     if frm in ['int2s', 'str2s']:
@@ -234,13 +247,21 @@ def format_opt_change(ch):
 
 class DialogMK2:
 
-    def __init__(self, optman):
+    def __init__(self, optman, title=None, subset=None, how=None):
         """ optman -- cd_opts_dlg.py/OptionsMan
+            how --
+            * how.get('hide_fil', False)
+            * how.get('hide_lex_fil', False)
+            * how.get('only_for_ul', not ens['tofi'])         # Forbid to switch fo File ops
+
+            - how.get('stor_json', 'user.json')
+            - how.get('only_with_def', False) # Forbid to switch fo User+Lexer ops
         """
         global ui_max_history_edits
         global font_name
         global font_size
 
+        #TODO get value from options if not present
         ui_max_history_edits = optman.get_scope_value('ui_max_history_edits', scope='u',
                                                         default=ui_max_history_edits)
         _font_name_opt = optman.get_opt('font_name')
@@ -251,7 +272,15 @@ class DialogMK2:
         self._form_rect = {} # dict - x,y,w,h
         self._state = {}
 
+        self.title = title or TITLE_DEFAULT
         self.optman = optman
+        self.subset = subset # None - ok
+        self.hidden_scopes = [] # 'l' and/or 'f'
+        if how:
+            if how.get('hide_fil')  or  how.get('hide_lex_fil')  or  how.get('only_for_ul'):
+                self.hidden_scopes.append('f')
+            if how.get('hide_lex_fil'):
+                self.hidden_scopes.append('l')
         self._load_dlg_cfg()
 
         self.current_sort = self._state.get(STATE_KEY_SORT_COL, 'Option')
@@ -318,14 +347,16 @@ class DialogMK2:
 
         if os.path.exists(FORMS_CFG_JSON):
             with open(FORMS_CFG_JSON, 'r', encoding='utf-8') as f:
-                j_form = json.load(f).get(PLING_KEY)
+                j_form = json.load(f).get(self.title)
             if j_form:
                 self._form_rect = {k:v for k,v in j_form.items()
                                         if v  and  k in {'x', 'y', 'w', 'h'}}
 
         if os.path.exists(PLING_HISTORY_JSON):
             with open(PLING_HISTORY_JSON, 'r', encoding='utf-8') as f:
-                j = json.load(f).get(PLING_KEY)
+                j_all = json.load(f)
+
+            j = j_all.get(PLING_KEY)
             if j:
                 _state_keys = {
                     STATE_KEY_TREE_W,
@@ -337,6 +368,12 @@ class DialogMK2:
                 }
                 self._state = {k:v for k,v in j.items()  if k in _state_keys}
 
+                # if subset - overwrite general values with subset's
+                _subsets = j.get('subsets')
+                if self.subset  and  _subsets:
+                    self._state.update(_subsets.get(self.subset, {}))
+
+
                 _filt_hist = j.get(STATE_KEY_FILTER_HIST)
                 if _filt_hist:
                     filter_history.clear()
@@ -344,16 +381,35 @@ class DialogMK2:
 
                 _col_cfg = j.get(STATE_KEY_COL_CFG)
                 if _col_cfg:
+                    if self.hidden_scopes:
+                        hidden_columns = set()
+                        if 'l' in self.hidden_scopes:   hidden_columns.add(COL_VAL_LEX)
+                        if 'f' in self.hidden_scopes:   hidden_columns.add(COL_VAL_FILE)
+                        _col_cfg = [col for col in _col_cfg  if col[0] not in hidden_columns]
+
                     opt_col_cfg.clear()
                     opt_col_cfg.extend(_col_cfg)
                 pass;       LOG and print(f' --- Loaded state: {json.dumps(j, indent=4)}')
+
+            # no history - load from opted plugin
+            else:
+                j_opted = j_all.get('cd_opts_dlg', {}).get('dlg')
+                if j_opted:
+                    opted_state = {
+                        STATE_KEY_DESCR_MEMO_H: j_opted.get("df.cmnt_heght"),
+                        STATE_KEY_SEL_OPT:      j_opted.get("df.cur_op"),
+                    }
+                    self._state = {k:v  for k,v in opted_state.items()  if v is not None}
+
+                    filter_history.clear()
+                    filter_history.extend(j_opted.get('df.h.cond', []))
 
 
     def _save_dlg_cfg(self):
         # window position/dimensions
         form_prop = dlg_proc(self.h, DLG_PROP_GET)
         j_form = {'x':form_prop['x'], 'y':form_prop['y'], 'w':form_prop['w'], 'h':form_prop['h']}
-        json_update(FORMS_CFG_JSON, key=PLING_KEY, val=j_form)
+        json_update(FORMS_CFG_JSON,  key=self.title,  val=j_form)
 
         # states
         j = {}
@@ -364,6 +420,12 @@ class DialogMK2:
         j[STATE_KEY_FILTER_VISIBLE] = dlg_proc(self.h, DLG_CTL_PROP_GET, name='panel_filter')['vis']
         j[STATE_KEY_SORT_COL] = self.current_sort
         j[STATE_KEY_SEL_OPT] = self._cur_opt_name
+
+        # save some options separately -- 3rd party options: move from `j` to `j/subsets/<subset>`
+        if self.subset:
+            j_subset = {k:j.pop(k) for k in SUBSET_KEYS}
+            _subsets = j.setdefault('subsets', {})
+            _subsets[self.subset] = j_subset
 
         j[STATE_KEY_COL_CFG] = opt_col_cfg
 
@@ -386,8 +448,13 @@ class DialogMK2:
 
         # restore selected-option (+show it)
         last_sel_opt = self._state.get(STATE_KEY_SEL_OPT)
-        if last_sel_opt  and  last_sel_opt in self._list_opt_names:
-            _ind = self._list_opt_names.index(last_sel_opt)
+        if self._list_opt_names:
+            if last_sel_opt  and  last_sel_opt in self._list_opt_names:
+                _ind = self._list_opt_names.index(last_sel_opt)
+            else:   # if no saved selected opt - select first
+                print(f'---selecting FIRST')
+
+                _ind = 0
             listbox_proc(self._h_list, LISTBOX_SET_SEL, index=_ind)
             _top = max(0, _ind-3)
             listbox_proc(self._h_list, LISTBOX_SET_TOP, index=_top)
@@ -397,7 +464,7 @@ class DialogMK2:
         # DBG #############
         if IS_DBG:
             DialogMK2._dlg = self
-            cmds = [    'from cuda_options_editor_my.dlg import DialogMK2',
+            cmds = [    'from cuda_prefs.dlg import DialogMK2',
                         'globals()["dlg"] = DialogMK2._dlg',]
             app_proc(PROC_EXEC_PYTHON, '\n'.join(cmds))
             del DialogMK2._dlg
@@ -424,7 +491,7 @@ class DialogMK2:
 
         ###### FORM #######################
         dlg_proc(h, DLG_PROP_SET, prop={
-                'cap': 'CudaText Preferences',
+                'cap': self.title,
                 'w': 600, 'h': 400,
                 'border': DBORDER_SIZE,
                 'color': color_form_bg,
@@ -484,8 +551,8 @@ class DialogMK2:
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'name': 'panel_filter',
                 'p': 'panel_right',
-                'align': ALIGN_BOTTOM,  'h': BTN_H, 'max_h': BTN_H,
-                'vis': self._state.get(STATE_KEY_FILTER_VISIBLE, False),
+                'align': ALIGN_TOP,  'h': BTN_H, 'max_h': BTN_H,
+                #'vis': self._state.get(STATE_KEY_FILTER_VISIBLE, False),
                 })
         # filter combo ##########
         n = dlg_proc(h, DLG_CTL_ADD, 'editor_combo')
@@ -649,17 +716,17 @@ class DialogMK2:
         edt.set_prop(PROP_LAST_LINE_ON_TOP, False)
         edt.set_prop(PROP_WRAP, WRAP_ON_WINDOW)
 
+        # scopes combo
         scopes = ['User']
         lex = ed.get_prop(PROP_LEXER_FILE)
-        if lex:
+        if lex  and  'l' not in self.hidden_scopes:
             scopes.append('Lexer: '+lex)
             self._scope_captions['l'] = scopes[-1]
-        if ed.get_filename():
+        if ed.get_filename()  and  'f' not in self.hidden_scopes:
             filename = os.path.split(ed.get_filename())[1]
             scopes.append('File: '+filename)
             self._scope_captions['f'] = scopes[-1]
         self.scope_ed = Editor(h_scope_ed)
-        #self.scope_ed.set_prop(PROP_FONT, ('Arial', '8'))
         self.scope_ed.set_prop(PROP_RO, True)
         self.scope_ed.set_prop(PROP_COMBO_ITEMS, '\n'.join(scopes))
 
@@ -829,7 +896,9 @@ class DialogMK2:
             if opt_change.name == self._cur_opt_name:
                 if opt_change.value is not None:  # setting value
                     # (scope, val) - [f],[l],[u], [def]
-                    active_scoped_val = (opt_change.scope,  opt_change.value)
+                    _opt = self.optman.get_opt(opt_change.name)
+                    ui_val = self.optman.value2uival(_opt, opt_change.value)
+                    active_scoped_val = (opt_change.scope,  ui_val)
                     pass;       LOG and print(f'NOTE: using change value: {opt_change}')
                     break
                 else: # unsetting option
@@ -851,6 +920,7 @@ class DialogMK2:
         with ignore_edit(self.h, self.scope_ed):
             self.scope_ed.set_text_all(new_scope_name)
         self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=active_scoped_val)
+
 
     def _on_reset(self, id_dlg, id_ctl, data='', info=''):
         """ remove option for current scope
@@ -896,7 +966,10 @@ class DialogMK2:
 
 
     def _on_scope_change(self, id_dlg, id_ctl, data='', info=''):
-        cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=False)
+        if not self._cur_opt:
+            return
+
+        cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
         pass;       LOG and print(f' -- scoped val:{self.scope}:[{cur_scope_val}]')
 
         self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=(self.scope, cur_scope_val))
@@ -965,7 +1038,7 @@ class DialogMK2:
             menu_proc(self._h_col_menu, MENU_SHOW)
 
     def toggle_filter(self, show=False):
-        dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_filter', prop={'vis': show})
+        #dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_filter', prop={'vis': show})
 
         if show == False:  # if hiding filter - reset tree selection to 'All'
             for item_id,name in tree_proc(self._h_tree, TREE_ITEM_ENUM):
@@ -1151,15 +1224,15 @@ class ValueEds:
             self.val_edit.set_prop(PROP_NUMBERS_ONLY, True)
 
         elif newtype == 'int2s':
-            ed_val = map_option_value(opt, val=value)
+            #ed_val = map_option_value(opt, caption=value)
             with ignore_edit(h, self.val_combo):
-                self.val_combo.set_text_all(ed_val)
+                self.val_combo.set_text_all(value)
             self.val_combo.set_prop(PROP_COMBO_ITEMS, '\n'.join(opt['jdc']))
 
         elif newtype == 'str2s':
-            ed_val = map_option_value(opt, val=value)
+            #ed_val = map_option_value(opt, caption=value)
             with ignore_edit(h, self.val_combo):
-                self.val_combo.set_text_all(ed_val)
+                self.val_combo.set_text_all(value)
             self.val_combo.set_prop(PROP_COMBO_ITEMS, '\n'.join(opt['jdc']))
 
         elif newtype == 'strs':
