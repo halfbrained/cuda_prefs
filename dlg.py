@@ -38,6 +38,8 @@ import time
 * test loading opted's state
 
 #TODO:
+* test with translation
+
 * list changes in dlg-statusbar + hover popup
 * add help
 * some options not applied (font)
@@ -57,7 +59,7 @@ file:///mnt/H/cuda/__FM/data/themes/cobalt.cuda-theme-ui
 _   = get_translation(__file__)  # I18N
 
 
-TITLE_DEFAULT = 'CudaText Preferences'
+TITLE_DEFAULT = _('CudaText Preferences')
 
 OptChange = namedtuple('OptChange', 'name scope value lexer old_value')
 
@@ -93,14 +95,14 @@ VK_F = ord('F')
 VK_ESCAPE = 27
 LIST_SEP = chr(1)
 
-BTN_H = 24
+BTN_H = app_proc(PROC_GET_GUI_HEIGHT, 'button')
 PAD = 2
 
 # colores
 COL_FONT = 0
 COL_SPLITTER = 0
 
-TREE_ITEM_ALL = '[ All ]'
+TREE_ITEM_ALL = _('[ All ]')
 
 # columns
 COL_SECTION     = 'Section'
@@ -111,6 +113,16 @@ COL_VAL_USER    = 'User'
 COL_VAL_LEX     = 'Lexer'
 COL_VAL_FILE    = 'File'
 COL_VAL_MAIN    = 'Value' # current value -- most specific f,l,u,def value
+
+UI_COLUMNS = {
+    COL_SECTION     : _('Section'),
+    COL_OPT_NAME    : _('Option'),
+    COL_VAL_DEFAULT : _('Default'),
+    COL_VAL_USER    : _('User'),
+    COL_VAL_LEX     : _('Lexer'),
+    COL_VAL_FILE    : _('File'),
+    COL_VAL_MAIN    : _('Value'),
+}
 
 OPTS_COLUMN_MAP = {
     COL_SECTION     : 'chp',
@@ -134,6 +146,7 @@ COLS_LIST = [
     COL_VAL_LEX,
     COL_VAL_FILE,
 ]
+
 
 opt_col_cfg = [("Option", 70), ("Value", 100)]
 
@@ -210,10 +223,15 @@ def map_option_value(opt, val=None, caption=None):
             return val
 
         else:
-            raise Exception(f'OptionMapValueError: require "val" or "caption"')
+            raise OptionMapValueError('require "val" or "caption"')
+
+    elif frm in ['font', 'strs', 'font-e']:
+        if val      is not None: return val
+        if caption  is not None: return caption
+
     else:
-        raise Exception(f'OptionMapValueError: Unsupported option format: {opt["opt"], opt["frm"]}')
-    raise Exception(f'OptionMapValueError: Couldn"t find: {val, caption, opt}')
+        raise OptionMapValueError('Unsupported option format: {}'.format((opt["opt"], opt["frm"])))
+    raise OptionMapValueError('Couldn"t find: {}, {}\n + {}'.format(val, caption, opt))
 
 
 def json_update(path, key, val):
@@ -235,14 +253,17 @@ def json_update(path, key, val):
 
 def format_opt_change(ch):
     scope_str = ch.scope
-    if   ch.scope == 'u': scope_str = 'User'
-    elif ch.scope == 'l': scope_str = 'Lexer: {ch.lexer}'
-    elif ch.scope == 'f': scope_str = 'File: ' +os.path.basename(ed.get_filename())
+    if   ch.scope=='u': scope_str = ui_column(COL_VAL_USER)
+    elif ch.scope=='l': scope_str = ui_column(COL_VAL_LEX) + str(ch.lexer)
+    elif ch.scope=='f': scope_str = ui_column(COL_VAL_FILE)+': '+os.path.basename(ed.get_filename())
 
-    if ch.value is None:    val_str = 'reset'
-    else:                   val_str = f'{ch.old_value} -> {ch.value}'
+    if ch.value is None:    val_str = _('reset')
+    else:                   val_str = '{} -> {}'.format(ch.old_value, ch.value)
 
-    return f'{ch.name} [{scope_str}] {val_str}'
+    return '{} [{}] {}'.format(ch.name, scope_str, val_str)
+
+def ui_column(colname):
+    return UI_COLUMNS.get(colname, colname)
 
 
 class DialogMK2:
@@ -283,7 +304,7 @@ class DialogMK2:
                 self.hidden_scopes.append('l')
         self._load_dlg_cfg()
 
-        self.current_sort = self._state.get(STATE_KEY_SORT_COL, 'Option')
+        self.current_sort = self._state.get(STATE_KEY_SORT_COL, COL_OPT_NAME)
         self.sort_reverse = False
         self._last_applied_filter = None
         self._cur_opt_name = None
@@ -301,8 +322,12 @@ class DialogMK2:
         self._lb_icon_inds = {} # listbox icons
         self._list_opt_names = [] # current displayed list of option-names
         # '' -> User -- showing default value, edited value will be added to 'user' scope
-        self._scope_captions = {'u': 'User', '': 'User', 'def': 'User'} # 'u' -> 'User' ... expanded alter
         self._col_toggle_cmds = {} # column name -> toggle lambda -- for menu, to toggle list columns
+        self._scope_captions = { # expanded alter
+                'u'  : ui_column(COL_VAL_USER),
+                ''   : ui_column(COL_VAL_USER),
+                'def': ui_column(COL_VAL_USER),
+                }
 
 
     @property
@@ -337,9 +362,9 @@ class DialogMK2:
         """ returns current scope char: u,l,f
         """
         scope_str = self.scope_ed.get_text_all()
-        if scope_str == 'User':             return 'u'
-        elif scope_str.startswith('Lexer'): return 'l'  # for future - show lexer name in scope
-        elif scope_str.startswith('File'):  return 'f'  #
+        if scope_str == ui_column(COL_VAL_USER):             return 'u'
+        elif scope_str.startswith(ui_column(COL_VAL_LEX)):   return 'l'
+        elif scope_str.startswith(ui_column(COL_VAL_FILE)):  return 'f'  #
 
 
     def _load_dlg_cfg(self):
@@ -389,7 +414,7 @@ class DialogMK2:
 
                     opt_col_cfg.clear()
                     opt_col_cfg.extend(_col_cfg)
-                pass;       LOG and print(f' --- Loaded state: {json.dumps(j, indent=4)}')
+                pass;       LOG and print(' --- Loaded state: '+json.dumps(j, indent=4))
 
             # no history - load from opted plugin
             else:
@@ -452,8 +477,6 @@ class DialogMK2:
             if last_sel_opt  and  last_sel_opt in self._list_opt_names:
                 _ind = self._list_opt_names.index(last_sel_opt)
             else:   # if no saved selected opt - select first
-                print(f'---selecting FIRST')
-
                 _ind = 0
             listbox_proc(self._h_list, LISTBOX_SET_SEL, index=_ind)
             _top = max(0, _ind-3)
@@ -539,7 +562,7 @@ class DialogMK2:
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'p': 'panel_right',
                 'align': ALIGN_CLIENT,
-                #'sp_b': PAD,
+                'sp_t': PAD,
                 'on_click': self._on_opt_click,
                 'on_click_header': self._on_header_click,
                 'on_menu': self.listbox_menu,
@@ -554,29 +577,30 @@ class DialogMK2:
                 'align': ALIGN_TOP,  'h': BTN_H, 'max_h': BTN_H,
                 #'vis': self._state.get(STATE_KEY_FILTER_VISIBLE, False),
                 })
+        # filter label
+        n = dlg_proc(h, DLG_CTL_ADD, 'label')
+        dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
+                'name': 'filter_label',
+                'p': 'panel_filter',
+                'a_l': ('', '['), 'a_t': ('', '-'),
+                'sp_l': PAD*2,
+                'cap': _('Filter: '),
+                'font_color': COL_FONT,
+                })
         # filter combo ##########
         n = dlg_proc(h, DLG_CTL_ADD, 'editor_combo')
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'name': 'filter',
                 'p': 'panel_filter',
                 'h': BTN_H, 'max_h': BTN_H,
-                'align': ALIGN_CLIENT,
-                'sp_t': PAD, 'sp_r': 20, 'sp_b': PAD,
-                #'a_l': None,   'a_r': ('', ']'),  'a_t': ('', '['),
+                #'align': ALIGN_CLIENT,
+                'sp_r': 20,
+                'a_l': ('filter_label', ']'),   'a_r': ('', ']'),  'a_t': ('filter_label', '-'),
                 'on_change': self._on_filter,
                 'on_key_down': self._on_filter, # for later -- live filter
                 })
         h_ed = dlg_proc(h, DLG_CTL_HANDLE, index=n)
         self._filter_ed = Editor(h_ed)
-        # filter label
-        n = dlg_proc(h, DLG_CTL_ADD, 'label')
-        dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
-                'p': 'panel_filter',
-                'sp_l': 8, 'sp_t': 6,
-                'align': ALIGN_LEFT,
-                'cap': 'Filter: ',
-                'font_color': COL_FONT,
-                })
 
 
         ### BOTTOM PANEL ###############################
@@ -607,7 +631,7 @@ class DialogMK2:
                 'h': BTN_H, 'max_h': BTN_H,
                 'a_l': None,   'a_r': ('scope', '['),  'a_t': ('scope', '-'),
                 'sp_t': 3,
-                'cap': 'Scope: ',
+                'cap': _('Scope: '),
                 'font_color': COL_FONT,
                 })
         # btn reset ###########
@@ -619,7 +643,7 @@ class DialogMK2:
                 'w': 60, 'max_w': 60,
                 'a_l': None,   'a_r': ('scope_label', '['),  'a_t': ('', '['),
                 'sp_l': PAD, 'sp_r': 32,
-                'cap':'Reset',
+                'cap': _('Reset'),
                 'on_change': self._on_reset,
                 })
         # option description #########
@@ -663,7 +687,7 @@ class DialogMK2:
                 'w': 60, 'max_w': 60,
                 'a_l': None, 'a_t': None, 'a_r': ('', ']'),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
-                'cap':'OK',
+                'cap': _('OK'),
                 'on_change': lambda *args, **vargs: (self.apply_changes(closing=True), self.close()),
                 })
         # Apply #######
@@ -674,7 +698,7 @@ class DialogMK2:
                 'w': 60, 'max_w': 60,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_ok', '['),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
-                'cap':'Apply',
+                'cap': _('Apply'),
                 'on_change': lambda *args, **vargs: self.apply_changes(),
                 })
         # Cancel #######
@@ -684,7 +708,7 @@ class DialogMK2:
                 'w': 60, 'max_w': 60,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_apply', '['),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
-                'cap':'Close',
+                'cap': _('Close'),
                 'on_change': lambda *args, **vargs: self.close(),
                 })
         # help #######
@@ -694,7 +718,7 @@ class DialogMK2:
                 'w': 60, 'max_w': 60,
                 'a_l': ('', '['),  'a_t': None, 'a_r': None, 'a_b': ('', ']'),
                 'sp_l': PAD*2, 'sp_b': PAD*2,
-                'cap':'Help',
+                'cap': _('Help'),
                 'on_change': self.dlg_help,
                 })
 
@@ -717,14 +741,14 @@ class DialogMK2:
         edt.set_prop(PROP_WRAP, WRAP_ON_WINDOW)
 
         # scopes combo
-        scopes = ['User']
+        scopes = [ui_column(COL_VAL_USER)]
         lex = ed.get_prop(PROP_LEXER_FILE)
         if lex  and  'l' not in self.hidden_scopes:
-            scopes.append('Lexer: '+lex)
+            scopes.append(ui_column(COL_VAL_LEX)+': '+lex)
             self._scope_captions['l'] = scopes[-1]
         if ed.get_filename()  and  'f' not in self.hidden_scopes:
             filename = os.path.split(ed.get_filename())[1]
-            scopes.append('File: '+filename)
+            scopes.append(ui_column(COL_VAL_FILE)+': '+filename)
             self._scope_captions['f'] = scopes[-1]
         self.scope_ed = Editor(h_scope_ed)
         self.scope_ed.set_prop(PROP_RO, True)
@@ -784,23 +808,27 @@ class DialogMK2:
         # columns
         column_captions, column_widths = self.columns
         column_widths[-1] = 0   # last col to 'fill' - to avoid h-scrollbar
-        column_captions_str = LIST_SEP.join(column_captions)
+        _ui_columns = map(lambda cap: ui_column(cap), column_captions) # generator
+        column_captions_str = LIST_SEP.join(_ui_columns)
         listbox_proc(self._h_list, LISTBOX_SET_COLUMNS, text=column_widths) # width<0 means value in %
         listbox_proc(self._h_list, LISTBOX_SET_HEADER, text=column_captions_str)
 
-        # sort icons
-        if self.current_sort:
+        # sort-icons
+        header_icon_cfg = []
+        if self.current_sort and self.current_sort in column_captions:
             sort_col_ind = column_captions.index(self.current_sort)
             _order_name = 'asc'  if not self.sort_reverse else  'desc'
             _icon_ind = self._lb_icon_inds[_order_name]
             header_icon_cfg = [-1]*sort_col_ind + [_icon_ind] # ~[-1, -1, -1, ind]
-            listbox_proc(self._h_list, LISTBOX_SET_HEADER_IMAGEINDEXES, text=header_icon_cfg)
+        listbox_proc(self._h_list, LISTBOX_SET_HEADER_IMAGEINDEXES, text=header_icon_cfg)
 
     def get_filtered_opts(self):
         sort_field = OPTS_COLUMN_MAP.get(self.current_sort, self.current_sort)
         return self.optman.get_list(self.filter_val, sort_field, reverse=self.sort_reverse)
 
     def set_filter(self, filter_str, tree_click=False):
+        if not filter_str:
+            self._filter_ed.set_text_all('')
         if self._last_applied_filter == filter_str:
             return
 
@@ -811,7 +839,7 @@ class DialogMK2:
         self.filter_val = filter_str
 
         opts = self.get_filtered_opts()
-        pass;       LOG and print(f' __ set_filter: opts len: {len(opts)}')
+        pass;       LOG and print(' __ set_filter: opts len: {}'.format(len(opts)))
         self.update_list(opts)
 
         # history
@@ -830,7 +858,7 @@ class DialogMK2:
 
 
     def set_sort(self, sort_name):
-        pass;       LOG and print(f' setting sort: {sort_name}')
+        pass;       LOG and print(' setting sort: {}'.format(sort_name))
 
         if self.current_sort == sort_name: # switch order
             self.sort_reverse = not self.sort_reverse
@@ -841,7 +869,7 @@ class DialogMK2:
 
         # if not present in map -- special value - send as is
         opts = self.get_filtered_opts()
-        pass;       LOG and print(f' __ set_sort: opts len: {len(opts)}')
+        pass;       LOG and print(' __ set_sort: opts len: {}'.format(len(opts)))
         self.update_list(opts)
 
 
@@ -864,8 +892,8 @@ class DialogMK2:
 
         lex = ed.get_prop(PROP_LEXER_FILE)  if scope == 'l' else None
         opt_change = OptChange(name,  scope,  val,  lexer=lex,  old_value=_old_val)
-        pass;       LOG and print(f'NOTE: new option change: {opt_change}')
-        msg_status('Preference: '+format_opt_change(opt_change))
+        pass;       LOG and print('NOTE: new option change: '+str(opt_change))
+        msg_status(_('Preference: ') + format_opt_change(opt_change))
         self._opt_changes.append(opt_change)
 
 
@@ -882,57 +910,11 @@ class DialogMK2:
             if items:
                 self._fill_tree(items, parent=item_id)
 
-    def _on_opt_click(self, id_dlg, id_ctl, data='', info=''):
-        #print(f'LIST CIKCK: {id_dlg, id_ctl, data, info}')
-
-        _sel_ind = listbox_proc(self._h_list, LISTBOX_GET_SEL)
-        self._cur_opt_name = self._list_opt_names[_sel_ind]
-        self._cur_opt = self.optman.get_opt(self._cur_opt_name)
-        self.edt.set_text_all(self._cur_opt.get('cmt', ''))
-
-        # if have a change for this option -- show it
-        removed_scopes = set()
-        for opt_change in reversed(self._opt_changes):
-            if opt_change.name == self._cur_opt_name:
-                if opt_change.value is not None:  # setting value
-                    # (scope, val) - [f],[l],[u], [def]
-                    _opt = self.optman.get_opt(opt_change.name)
-                    ui_val = self.optman.value2uival(_opt, opt_change.value)
-                    active_scoped_val = (opt_change.scope,  ui_val)
-                    pass;       LOG and print(f'NOTE: using change value: {opt_change}')
-                    break
-                else: # unsetting option
-                    removed_scopes.add(opt_change.scope)
-        else: # no matching changes
-            #active_scoped_val = self.optman.get_opt_active_value(self._cur_opt, is_ui=False, with_scope=True)
-            # skip values that were reset,
-            scopes = (scope  for scope in ['f', 'l', 'u', 'def']    if scope not in removed_scopes)
-            scoped_vals = ((sc, self.optman.get_opt_scope_value(self._cur_opt, sc, is_ui=False))    for sc in scopes)
-            active_scope = next(sc for sc,val in  scoped_vals  if val is not None) # result - is not None
-            active_scope_val = self.optman.get_opt_scope_value(self._cur_opt, active_scope, is_ui=True) # for UI
-            active_scoped_val = (active_scope, active_scope_val)
-            pass;       LOG and print(f' *** using option value: {active_scoped_val}')
-
-        new_scope, _new_val = active_scoped_val
-
-        # set scope
-        new_scope_name = self._scope_captions[new_scope]
-        with ignore_edit(self.h, self.scope_ed):
-            self.scope_ed.set_text_all(new_scope_name)
-        self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=active_scoped_val)
-
-
-    def _on_reset(self, id_dlg, id_ctl, data='', info=''):
-        """ remove option for current scope
-        """
-        _scope_str = self.scope_ed.get_text_all()
-        scope = _scope_str[0].lower()  if _scope_str else  ''
-        self.add_opt_change(self._cur_opt_name, scope, val=None)
 
     def on_opt_val_edit(self, id_dlg, id_ctl, data='', info=''):
         ed_name = self.val_eds.get_name(id_ctl)
         prop_type = self._cur_opt['frm']
-        pass;       LOG and print(f' + ed name: {ed_name} [{prop_type}]')
+        pass;       LOG and print(' + ed name: {} [{}]'.format(ed_name, prop_type))
 
         if ed_name == ValueEds.WGT_NAME__EDIT: # str, int, float, -hotk
             key_code, key_state = data
@@ -946,7 +928,7 @@ class DialogMK2:
             val = self.val_eds.val_combo.get_text_all()
             # only accept values from combo-items
             if val not in self.val_eds.val_combo.get_prop(PROP_COMBO_ITEMS):
-                pass;       LOG and print(f'NOTE: val not in combo: {val}')
+                pass;       LOG and print('NOTE: val not in combo: {}'.format(val))
                 return
 
             val = map_option_value(self._cur_opt, caption=val)
@@ -964,13 +946,62 @@ class DialogMK2:
         scope = scope_str[0].lower()  if scope_str else  ''
         self.add_opt_change(self._cur_opt_name, scope, val)
 
+    def _on_opt_click(self, id_dlg, id_ctl, data='', info=''):
+        #print('LIST CIKCK: {}'.format((id_dlg, id_ctl, data, info)))
+
+        _sel_ind = listbox_proc(self._h_list, LISTBOX_GET_SEL)
+        if _sel_ind == -1  or  not self._list_opt_names:
+            return
+
+        self._cur_opt_name = self._list_opt_names[_sel_ind]
+        self._cur_opt = self.optman.get_opt(self._cur_opt_name)
+        self.edt.set_text_all(self._cur_opt.get('cmt', ''))
+
+        # if have a change for this option -- show it
+        removed_scopes = set()
+        for opt_change in reversed(self._opt_changes):
+            if opt_change.name == self._cur_opt_name:
+                if opt_change.value is not None:  # setting value
+                    # (scope, val) - [f],[l],[u], [def]
+                    _opt = self.optman.get_opt(opt_change.name)
+                    ui_val = self.optman.value2uival(_opt, opt_change.value)
+                    active_scoped_val = (opt_change.scope,  ui_val)
+                    pass;       LOG and print('NOTE: using change value: '+str(opt_change))
+                    break
+                else: # unsetting option
+                    removed_scopes.add(opt_change.scope)
+        else: # no matching changes
+            #active_scoped_val = self.optman.get_opt_active_value(self._cur_opt, is_ui=False, with_scope=True)
+            # skip values that were reset,
+            scopes = (scope  for scope in ['f', 'l', 'u', 'def']    if scope not in removed_scopes)
+            scoped_vals = ((sc, self.optman.get_opt_scope_value(self._cur_opt, sc, is_ui=False))    for sc in scopes)
+            active_scope = next(sc for sc,val in  scoped_vals  if val is not None) # result - is not None
+            active_scope_val = self.optman.get_opt_scope_value(self._cur_opt, active_scope, is_ui=True) # for UI
+            active_scoped_val = (active_scope, active_scope_val)
+            pass;       LOG and print(' *** using option value: {}'.format(active_scoped_val))
+
+        new_scope, _new_val = active_scoped_val
+
+        # set scope
+        new_scope_name = self._scope_captions[new_scope]
+        with ignore_edit(self.h, self.scope_ed):
+            self.scope_ed.set_text_all(new_scope_name)
+        self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=active_scoped_val)
+
+
+    def _on_reset(self, id_dlg, id_ctl, data='', info=''):
+        """ remove option for current scope
+        """
+        _scope_str = self.scope_ed.get_text_all()
+        scope = _scope_str[0].lower()  if _scope_str else  ''
+        self.add_opt_change(self._cur_opt_name, scope, val=None)
 
     def _on_scope_change(self, id_dlg, id_ctl, data='', info=''):
         if not self._cur_opt:
             return
 
         cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
-        pass;       LOG and print(f' -- scoped val:{self.scope}:[{cur_scope_val}]')
+        pass;       LOG and print(' -- scoped val:{}:[{}]'.format(self.scope, cur_scope_val))
 
         self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=(self.scope, cur_scope_val))
 
@@ -981,10 +1012,10 @@ class DialogMK2:
                 _t0 = time.time()
                 self.set_filter(self.filter_val)
                 _t1 = time.time()
-                pass;       LOG and print(f'* set-filter time:{_t1-_t0:.3f}s')
+                pass;       LOG and print('* set-filter time:{:.3f}s'.format(_t1-_t0))
 
         #else:   # on_change  (typing, pasting)
-            #print(f'        . CHANGE')
+            #print('        . CHANGE')
 
     def _on_tree_click(self, id_dlg, id_ctl, data='', info=''):
         path = get_tree_path(self._h_tree, item_id=data)
@@ -994,7 +1025,7 @@ class DialogMK2:
             self.set_filter('@'+path)
 
     def _on_header_click(self, id_dlg, id_ctl, data='', info=''):
-        pass;       LOG and print(f'--- Header cliock-: {id_dlg, id_ctl, data, info}')
+        pass;       LOG and print('--- Header click-: {}'.format((id_dlg, id_ctl, data, info)))
         column_captions, _col_ws = self.columns
         col_ind = data
         self.set_sort(column_captions[col_ind])
@@ -1002,17 +1033,17 @@ class DialogMK2:
     def _on_key(self, id_dlg, id_ctl, data='', info=''):
         key_code = id_ctl
         state = data
-        #print(f' on -key:{key_code, state}')
+        #print(' on -key:{}'.format((key_code, state)))
 
         if key_code == VK_F  and  state == 'c': # Ctrl+F -- show+focus filter
             self.toggle_filter(show=True)
             self._filter_ed.focus()
             return False # consumed
 
-        elif key_code == VK_ESCAPE  and  not state:
-            if self._filter_ed.get_prop(PROP_FOCUSED): # <escape> in filter - hide filter
+        elif key_code == VK_ESCAPE  and  not state:  # <escape> in filter - clear
+            if self._filter_ed.get_prop(PROP_FOCUSED)  and  self.filter_val:
                 self.set_filter('')
-                self.toggle_filter(show=False)
+                #self.toggle_filter(show=False)
                 return False # consumed
 
     def listbox_menu(self, id_dlg, id_ctl, data='', info=''):
@@ -1023,7 +1054,8 @@ class DialogMK2:
 
                 for colname in COLS_LIST:
                     la = lambda col=colname: self.on_toggle_col(col)
-                    item_id = menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=colname)
+                    ui_col_name = ui_column(colname)
+                    item_id = menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=ui_col_name)
 
                     _enabled = colname != COL_OPT_NAME # 'option name' column - always shown
                     menu_proc(item_id, MENU_SET_ENABLED, command=_enabled)
@@ -1047,7 +1079,7 @@ class DialogMK2:
 
 
     def on_toggle_col(self, info):
-        pass;       LOG and print(f'NOTE: toggling column: {info}')
+        pass;       LOG and print('NOTE: toggling column: '+str(info))
 
         col_cfg = opt_col_cfg[:]
 
@@ -1059,7 +1091,7 @@ class DialogMK2:
             new_col_w = 100  if colname != '!' else  19
             opt_col_cfg.append((colname, new_col_w))
             opt_col_cfg.sort(key=lambda item: COLS_LIST.index(item[0]))
-        pass;       LOG and print(f' -- new columns: {opt_col_cfg}')
+        pass;       LOG and print(' -- new columns: '+str(opt_col_cfg))
 
         self.update_list_layout()
         _opts = self.get_filtered_opts()
@@ -1068,10 +1100,10 @@ class DialogMK2:
     def apply_changes(self, closing=False):
         """ batch apply qued option changes
         """
-        pass;       LOG and print(f'APPLY_CHANGES')
+        pass;       LOG and print('APPLY_CHANGES')
 
         if not self._opt_changes  and  not closing:
-            msg_status("No option changes has been made")
+            msg_status(_("No option changes has been made"))
             return
 
         for i,change in enumerate(self._opt_changes):
@@ -1162,23 +1194,24 @@ class ValueEds:
 
         newtype = opt.get('frm')
 
-        pass;       LOG and print(f'* SET type-value-ed: type:{newtype}, val:{value, scope}')
+        pass;       LOG and print('* SET type-value-ed: type:{}, val:{}'.format(
+                                                                        newtype, (scope, value)))
 
         self._hide_val_ed(h)
 
         # unsupported option format
         if newtype not in M.type_map:
-            print(f'PreferenesError: unsupported option type: {newtype}')
+            print(_('PreferenesError: unsupported option type: ')+str(newtype))
             return
 
         # disable option editing?  (some options cannot be a file opt)
         if scope == 'f'  and  not opt['opt'] in FILE_OPTS:
-            pass;       LOG and print(f'NOTE: not file option: disabling')
+            pass;       LOG and print('NOTE: not file option: disabling')
             n = self._wgt_ind(h, M.type_map['str'], show=True) # ~resets wgt props
             self._current_type = 'str'
             dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                     'en': False,
-                    'texthint': 'Not available for a file'
+                    'texthint': _('Not available for a file')
                     })
             with ignore_edit(h, self.val_edit):
                 self.val_edit.set_text_all('')
@@ -1302,7 +1335,7 @@ class ValueEds:
                 n = dlg_proc(h, DLG_CTL_ADD, 'check')
                 dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                         **default_props,
-                        'cap': 'Enable',
+                        'cap': _('Enable'),
                         'act': True,
                         'on_change': self._val_change_callback,
                         'val': '?', # to get thirt state '?' into rotation
@@ -1347,7 +1380,10 @@ class ValueEds:
         edt.set_prop(PROP_RO, False)
 
 
-HELP_TEXT = """About "Filter"
+class OptionMapValueError(Exception):
+    pass
+
+HELP_TEXT = _("""About "Filter"
  Suitable options will contain all specified words.
  Tips and tricks:
  • Add "#" to search the words also in comments.
@@ -1369,4 +1405,4 @@ HELP_TEXT = """About "Filter"
      !!! option is set for current file,
      L   default value is from "settings_default/lexer NNN.json",
      +   not CudaText standard option.
-"""
+""")
