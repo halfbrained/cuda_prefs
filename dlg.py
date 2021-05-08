@@ -46,6 +46,8 @@ import time
 
 * different color fo unapplied propery value in editor?
 
+* change to modal dialog
+
 * editor line state coloring for modified/unapplied("saved") options?
 * show user/lexer/file option-values for selected option?
 * indicate qued option change in list?
@@ -346,12 +348,12 @@ class DialogMK2:
         """
         captions = []
         widths = []
-        _total_w = sum(w for name,w in opt_col_cfg if name != '!') # total width withoud '!'<-px
+        _total_w = sum(w for name,w in opt_col_cfg if name != '!' and name != COL_SECTION) # total width withoud '!'<-px
         for caption,w in opt_col_cfg:
             captions.append(caption)
 
             # width: to negative percentages for listbox -- except '!' <- in px
-            if caption != '!':
+            if caption != '!' and caption != COL_SECTION:
                 w = -round(w/_total_w*100)
             widths.append(w)
 
@@ -364,7 +366,7 @@ class DialogMK2:
         scope_str = self.scope_ed.get_text_all()
         if scope_str == ui_column(COL_VAL_USER):             return 'u'
         elif scope_str.startswith(ui_column(COL_VAL_LEX)):   return 'l'
-        elif scope_str.startswith(ui_column(COL_VAL_FILE)):  return 'f'  #
+        elif scope_str.startswith(ui_column(COL_VAL_FILE)):  return 'f'
 
 
     def _load_dlg_cfg(self):
@@ -459,7 +461,7 @@ class DialogMK2:
 
     def show(self):
         if not self.h:
-            self.h, self.edt = self.init_form()
+            self.h, self.opt_comment_ed = self.init_form()
 
         self._fill_tree(self.optman.tree['kids'])
 
@@ -754,7 +756,7 @@ class DialogMK2:
         self.scope_ed.set_prop(PROP_RO, True)
         self.scope_ed.set_prop(PROP_COMBO_ITEMS, '\n'.join(scopes))
 
-        font = (font_name, font_size) if font_name and font_size else None
+        font = (font_name, font_size)  if font_name and font_size else  None
         if font:
             edt.set_prop(PROP_FONT, font)
             self.scope_ed.set_prop(PROP_FONT, font)
@@ -803,6 +805,9 @@ class DialogMK2:
                 ind = self._list_opt_names.index(self._cur_opt_name)
             #listbox_proc(self._h_list, LISTBOX_SET_TOP, max(0, ind-3)) # selecting is not helpful
             listbox_proc(self._h_list, LISTBOX_SET_SEL, ind)
+
+        self._on_opt_click(id_dlg=self.h, id_ctl=-1)
+
 
     def update_list_layout(self):
         # columns
@@ -950,12 +955,17 @@ class DialogMK2:
         #print('LIST CIKCK: {}'.format((id_dlg, id_ctl, data, info)))
 
         _sel_ind = listbox_proc(self._h_list, LISTBOX_GET_SEL)
-        if _sel_ind == -1  or  not self._list_opt_names:
+        if _sel_ind == -1  or  not self._list_opt_names:  #  nothing selected disable bottom panel
+            self._clear_opt_edits()
+            dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_value', prop={'en':False})
             return
+
+        # enable bottom panel before manipulations
+        dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_value', prop={'en':True})
 
         self._cur_opt_name = self._list_opt_names[_sel_ind]
         self._cur_opt = self.optman.get_opt(self._cur_opt_name)
-        self.edt.set_text_all(self._cur_opt.get('cmt', ''))
+        self.opt_comment_ed.set_text_all(self._cur_opt.get('cmt', ''))
 
         # if have a change for this option -- show it
         removed_scopes = set()
@@ -1069,15 +1079,6 @@ class DialogMK2:
 
             menu_proc(self._h_col_menu, MENU_SHOW)
 
-    def toggle_filter(self, show=False):
-        #dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_filter', prop={'vis': show})
-
-        if show == False:  # if hiding filter - reset tree selection to 'All'
-            for item_id,name in tree_proc(self._h_tree, TREE_ITEM_ENUM):
-                if name == TREE_ITEM_ALL:
-                    tree_proc(self._h_tree, TREE_ITEM_SELECT, id_item=item_id)
-
-
     def on_toggle_col(self, info):
         pass;       LOG and print('NOTE: toggling column: '+str(info))
 
@@ -1096,6 +1097,26 @@ class DialogMK2:
         self.update_list_layout()
         _opts = self.get_filtered_opts()
         self.update_list(_opts)
+
+
+    def _clear_opt_edits(self):
+        """ disables: 'scope combo', 'option comment'
+        """
+        with ignore_edit(self.h, self.opt_comment_ed):
+            self.opt_comment_ed.set_text_all('')
+        with ignore_edit(self.h, self.scope_ed):
+            self.scope_ed.set_text_all('')
+
+        self.val_eds.clear_edits(self.h)
+
+
+    def toggle_filter(self, show=False):
+        #dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_filter', prop={'vis': show})
+
+        if show == False:  # if hiding filter - reset tree selection to 'All'
+            for item_id,name in tree_proc(self._h_tree, TREE_ITEM_ENUM):
+                if name == TREE_ITEM_ALL:
+                    tree_proc(self._h_tree, TREE_ITEM_SELECT, id_item=item_id)
 
     def apply_changes(self, closing=False):
         """ batch apply qued option changes
@@ -1275,6 +1296,13 @@ class ValueEds:
         #end if
 
         self._current_type = newtype
+
+    def clear_edits(self, h):
+        M = ValueEds
+
+        self._hide_val_ed(h)
+        _n = self._wgt_ind(h, M.WGT_NAME__EDIT, show=True) # ~resets wgt props
+        self.val_edit.set_text_all('')
 
     def get_name(self, id_ctl):
         return self._ctl_names.get(id_ctl)
