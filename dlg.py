@@ -42,7 +42,6 @@ import time
 
 #TODO:
 
-
 * different color fo unapplied propery value in editor?
 * os scale
 
@@ -1164,11 +1163,18 @@ class DialogMK2:
         if self._h_help == None:
             w, h = 600, 450
             self._h_help = dlg_proc(0, DLG_CREATE)
+
+            colors = app_proc(PROC_THEME_UI_DICT_GET, '')
+            col_ed_bg = colors['EdTextBg']['color']
+            col_ed_font = colors['EdTextFont']['color']
+            color_form_bg = colors['ButtonBorderPassive']['color']
+
             dlg_proc(self._h_help, DLG_PROP_SET,
                         prop={'cap': _('Help'),
                             'w': w,
                             'h': h,
                             'resize': True,
+                            'color': color_form_bg,
                             }
                         )
 
@@ -1179,6 +1185,8 @@ class DialogMK2:
                             'align': ALIGN_CLIENT,
                             'val': HELP_TEXT,
                             'sp_a':6,
+                            'color': col_ed_bg,
+                            'font_color': col_ed_font,
                             }
                         )
 
