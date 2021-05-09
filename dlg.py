@@ -542,8 +542,6 @@ class DialogMK2:
                 'keypreview': True,
                 'on_key_down': self._on_key,
                 'on_close': lambda *args, **vargs: self._save_dlg_cfg(),
-
-                **self._form_rect, # restore saved - x,y,w,h
                 })
 
         ###### MAIN PANEL
@@ -561,7 +559,7 @@ class DialogMK2:
                 'name': 'category_tree',
                 'p': 'panel_main',
                 'align': ALIGN_LEFT,
-                'w': self._state.get(STATE_KEY_TREE_W, 100),
+                'w': 100,
                 #'sp_r': PAD,
                 'on_change': self._on_tree_click,
                 })
@@ -673,7 +671,7 @@ class DialogMK2:
                 'p': 'panel_value',
                 'sp_t': BTN_H + PAD,
                 'align': ALIGN_CLIENT,
-                'h': self._state.get(STATE_KEY_DESCR_MEMO_H, 100),
+                'h': 100,
                 })
         h_ed = dlg_proc(h, DLG_CTL_HANDLE, index=n)
         edt = Editor(h_ed)
@@ -781,6 +779,19 @@ class DialogMK2:
             self._filter_ed.set_prop(PROP_FONT, font)
 
         dlg_proc(h, DLG_SCALE)
+
+        # unscale saved-state dimensions
+        if self._form_rect:
+            dlg_proc(h, DLG_PROP_SET, prop=self._form_rect)
+        if self._state.get(STATE_KEY_TREE_W):
+            dlg_proc(h, DLG_CTL_PROP_SET, name='category_tree', prop={
+                    'w': self._state.get(STATE_KEY_TREE_W),
+                    })
+        if self._state.get(STATE_KEY_DESCR_MEMO_H):
+            dlg_proc(h, DLG_CTL_PROP_SET, name='descr_memo', prop={
+                    'h': self._state.get(STATE_KEY_DESCR_MEMO_H),
+                    })
+
         return h, edt
 
     def update_list(self, opts):
@@ -1345,7 +1356,10 @@ class ValueEds:
             'name': name,
             'p': M.VALUE_ED_PANEL,
             'h': BTN_H, 'max_h': BTN_H,
-            'a_l': ('', '['),       'a_r': (M.VALUE_ED_RESET, '['),        'a_t': ('', '['),
+            'a_l': ('', '['),
+            'a_t': (M.VALUE_ED_RESET, '['),
+            'a_r': (M.VALUE_ED_RESET, '['),
+            'a_b': (M.VALUE_ED_RESET, ']'),
             'sp_l': PAD,
             'act': True, 'en': True,
         }
