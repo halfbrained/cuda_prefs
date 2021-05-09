@@ -36,22 +36,24 @@ import time
 * opted 3d-party api
 * test subset options
 * test loading opted's state
-
-#TODO:
 * test with translation
-
-* list changes in dlg-statusbar + hover popup
 * add help
 * some options not applied (font)
 
+#TODO:
+
+
 * different color fo unapplied propery value in editor?
+* os scale
 
 * change to modal dialog
+* readme
 
+?
+* list changes in dlg-statusbar + hover popup
 * editor line state coloring for modified/unapplied("saved") options?
 * show user/lexer/file option-values for selected option?
 * indicate qued option change in list?
-* os scale
 * different filter background?
 
 
@@ -348,13 +350,15 @@ class DialogMK2:
         """
         captions = []
         widths = []
-        _total_w = sum(w for name,w in opt_col_cfg if name != '!' and name != COL_SECTION) # total width withoud '!'<-px
+        _total_w = sum(w for name,w in opt_col_cfg if isinstance(w, int))
         for caption,w in opt_col_cfg:
             captions.append(caption)
 
             # width: to negative percentages for listbox -- except '!' <- in px
-            if caption != '!' and caption != COL_SECTION:
+            if isinstance(w, int):
                 w = -round(w/_total_w*100)
+            else:
+                w = int(w[:-2]) # "100px" => 100
             widths.append(w)
 
         return captions,widths
@@ -401,18 +405,33 @@ class DialogMK2:
                     self._state.update(_subsets.get(self.subset, {}))
 
 
+                # filter history
                 _filt_hist = j.get(STATE_KEY_FILTER_HIST)
                 if _filt_hist:
                     filter_history.clear()
                     filter_history.extend(_filt_hist)
 
+                # list columns
                 _col_cfg = j.get(STATE_KEY_COL_CFG)
                 if _col_cfg:
+                    import re
+
+                    # hide lexer and file scopes  if disabled
                     if self.hidden_scopes:
                         hidden_columns = set()
                         if 'l' in self.hidden_scopes:   hidden_columns.add(COL_VAL_LEX)
                         if 'f' in self.hidden_scopes:   hidden_columns.add(COL_VAL_FILE)
                         _col_cfg = [col for col in _col_cfg  if col[0] not in hidden_columns]
+
+                    # check if only integers and str (~"100px")
+                    for i in range(len(_col_cfg)):
+                        item = _col_cfg[i]
+                        colname,w = item
+                        if not isinstance(w, int)  and  not (isinstance(w, str)
+                                                                and re.match('^\d+px$', w)):
+                            print(_('NOTE: {}: invalid column width format: {}')
+                                        .format(self.title, item))
+                            _col_cfg[i] = (colname,100)
 
                     opt_col_cfg.clear()
                     opt_col_cfg.extend(_col_cfg)
@@ -1085,7 +1104,10 @@ class DialogMK2:
         if colname in cur_col_names:  # disableg column
             del opt_col_cfg[cur_col_names.index(colname)]
         else:  # add new column
-            new_col_w = 100  if colname != '!' else  19
+            new_col_w = 100
+            if   colname == '!':          new_col_w = '19px'
+            elif colname == COL_SECTION:  new_col_w = '120px'
+
             opt_col_cfg.append((colname, new_col_w))
             opt_col_cfg.sort(key=lambda item: COLS_LIST.index(item[0]))
         pass;       LOG and print(' -- new columns: '+str(opt_col_cfg))
