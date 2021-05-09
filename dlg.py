@@ -1080,7 +1080,8 @@ class DialogMK2:
                 for colname in COLS_LIST:
                     la = lambda col=colname: self.on_toggle_col(col)
                     ui_col_name = ui_column(colname)
-                    item_id = menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=ui_col_name)
+                    item_id = menu_proc(self._h_col_menu, MENU_ADD,
+                                command=la, caption=ui_col_name, tag=colname)
 
                     _enabled = colname != COL_OPT_NAME # 'option name' column - always shown
                     menu_proc(item_id, MENU_SET_ENABLED, command=_enabled)
@@ -1089,7 +1090,7 @@ class DialogMK2:
             # update check state
             current_columns, _col_ws = self.columns
             for prop in menu_proc(self._h_col_menu, MENU_ENUM):
-                _checked = prop['cap'] in current_columns
+                _checked = prop['tag'] in current_columns
                 menu_proc(prop['id'], MENU_SET_CHECKED, command=_checked)
 
             menu_proc(self._h_col_menu, MENU_SHOW)
