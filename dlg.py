@@ -39,16 +39,14 @@ import time
 * test with translation
 * add help
 * some options not applied (font)
-
-#TODO:
-
-* different color fo unapplied propery value in editor?
 * os scale
-
 * change to modal dialog
 * readme
 
+#TODO:
+
 ?
+* different color fo unapplied propery value in editor?
 * list changes in dlg-statusbar + hover popup
 * editor line state coloring for modified/unapplied("saved") options?
 * show user/lexer/file option-values for selected option?
@@ -513,7 +511,8 @@ class DialogMK2:
             del DialogMK2._dlg
         ###########
 
-        dlg_proc(self.h, DLG_SHOW_NONMODAL)
+        dlg_proc(self.h, DLG_SHOW_MODAL)
+        dlg_proc(self.h, DLG_FREE)
 
     def init_form(self):
         global COL_FONT

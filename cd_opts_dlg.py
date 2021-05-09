@@ -940,12 +940,7 @@ class Command:
     def _dlg_opt(self):
         defs_json   = apx.get_opt('dlg_cuda_options.defs_json', 'default.json')
         defs_json   = defs_json     if os.sep in defs_json else     apx.get_def_setting_dir()+os.sep+defs_json
-        opted = OptEdD(
-          path_keys_info=defs_json
-        , subset='df.'
-        )
-        # for access from Console:  xxcuda_options_editor_my._dbg_opted
-        self._dbg_opted = opted
+        opted = OptEdD(path_keys_info=defs_json, subset='df.')
         opted.show(_('CudaText options lite'))
        #def _dlg_opt
    #class Command
