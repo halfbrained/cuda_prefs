@@ -297,12 +297,15 @@ class DialogMK2:
         self.title = title or TITLE_DEFAULT
         self.optman = optman
         self.subset = subset # None - ok
+        # gather not-available scopes
         self.hidden_scopes = [] # 'l' and/or 'f'
-        if how:
-            if how.get('hide_fil')  or  how.get('hide_lex_fil')  or  how.get('only_for_ul'):
-                self.hidden_scopes.append('f')
-            if how.get('hide_lex_fil'):
-                self.hidden_scopes.append('l')
+        if (how  and  how.get('hide_fil')  or  how.get('hide_lex_fil')  or  how.get('only_for_ul')) \
+                                                                            or not ed.get_filename():
+            self.hidden_scopes.append('f')
+        if how.get('hide_lex_fil')  or  not ed.get_prop(PROP_LEXER_FILE):
+            self.hidden_scopes.append('l')
+
+
         self._load_dlg_cfg()
 
         self.current_sort = self._state.get(STATE_KEY_SORT_COL, COL_OPT_NAME)
@@ -994,7 +997,7 @@ class DialogMK2:
         self.opt_comment_ed.set_text_all(self._cur_opt.get('cmt', ''))
 
         # if have a change for this option -- show it
-        removed_scopes = set()
+        removed_scopes = set(self.hidden_scopes)
         for opt_change in reversed(self._opt_changes):
             if opt_change.name == self._cur_opt_name:
                 if opt_change.value is not None:  # setting value
@@ -1014,7 +1017,7 @@ class DialogMK2:
             active_scope = next(sc for sc,val in  scoped_vals  if val is not None) # result - is not None
             active_scope_val = self.optman.get_opt_scope_value(self._cur_opt, active_scope, is_ui=True) # for UI
             active_scoped_val = (active_scope, active_scope_val)
-            pass;       LOG and print(' *** using option value: {}'.format(active_scoped_val))
+            pass;       LOG and print(' *** using option value: {}; removed:{}'.format(active_scoped_val, removed_scopes))
 
         new_scope, _new_val = active_scoped_val
 
