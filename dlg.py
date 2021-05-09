@@ -947,9 +947,7 @@ class DialogMK2:
             hotkey = dlg_hotkey(title=self._cur_opt_name)
             val = hotkey
 
-        scope_str = self.scope_ed.get_text_all()
-        scope = scope_str[0].lower()  if scope_str else  ''
-        self.add_opt_change(self._cur_opt_name, scope, val)
+        self.add_opt_change(self._cur_opt_name, self.scope, val)
 
     def _on_opt_click(self, id_dlg, id_ctl, data='', info=''):
         #print('LIST CIKCK: {}'.format((id_dlg, id_ctl, data, info)))
@@ -1002,9 +1000,7 @@ class DialogMK2:
     def _on_reset(self, id_dlg, id_ctl, data='', info=''):
         """ remove option for current scope
         """
-        _scope_str = self.scope_ed.get_text_all()
-        scope = _scope_str[0].lower()  if _scope_str else  ''
-        self.add_opt_change(self._cur_opt_name, scope, val=None)
+        self.add_opt_change(self._cur_opt_name, self.scope, val=None)
 
     def _on_scope_change(self, id_dlg, id_ctl, data='', info=''):
         if not self._cur_opt:
