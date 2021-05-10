@@ -833,6 +833,7 @@ class OptionsMan:
             return None
 
         override_str = opt['!']
+        override_str = override_str.replace('+', '')
         if override_str == '': # default
             res = opt['jdf']  if is_ui else  opt['def']
             scope = ''
