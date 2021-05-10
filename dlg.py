@@ -60,12 +60,6 @@ file:///mnt/H/cuda/__FM/data/themes/cobalt.cuda-theme-ui
 
 _   = apx.get_translation(__file__)  # I18N
 
-if os.name=='nt':
-    OS_SUFFIX = ''
-elif sys.platform=='darwin':
-    OS_SUFFIX = '__mac'
-else:
-    OS_SUFFIX = '__linux'
 
 TITLE_DEFAULT = _('CudaText Preferences')
 
@@ -293,8 +287,9 @@ class DialogMK2:
         #TODO get value from options if not present
         ui_max_history_edits = optman.get_scope_value('ui_max_history_edits', scope='u',
                                                         default=ui_max_history_edits)
-        font_name = apx.get_opt('font_name'+OS_SUFFIX)
-        font_size = apx.get_opt('font_size'+OS_SUFFIX)
+        _os_suffix = app_proc(PROC_GET_OS_SUFFIX, '')
+        font_name = apx.get_opt('font_name'+_os_suffix)
+        font_size = apx.get_opt('font_size'+_os_suffix)
 
         self._form_rect = {} # dict - x,y,w,h
         self._state = {}
