@@ -505,6 +505,9 @@ class DialogMK2:
             #### click event
             self._on_opt_click(id_dlg=self.h, id_ctl=-1)
 
+        # focus filter on start
+        timer_proc(TIMER_START_ONE,  callback=lambda *args,**vargs: self._filter_ed.focus(),   interval=100)
+
         # DBG #############
         if IS_DBG:
             DialogMK2._dlg = self
@@ -533,6 +536,7 @@ class DialogMK2:
         #color_form_bg = colors['TabPassive']['color']
         #color_form_bg = colors['EdTextBg']['color']
         color_form_bg = colors['ButtonBorderPassive']['color']
+        color_form_bg = colors['TabBg']['color']
 
         ###### FORM #######################
         dlg_proc(h, DLG_PROP_SET, prop={
@@ -758,6 +762,7 @@ class DialogMK2:
         edt.set_prop(PROP_MINIMAP, False)
         edt.set_prop(PROP_MICROMAP, False)
         edt.set_prop(PROP_LAST_LINE_ON_TOP, False)
+        edt.set_prop(PROP_HILITE_CUR_LINE, False)
         edt.set_prop(PROP_WRAP, WRAP_ON_WINDOW)
 
         # scopes combo
