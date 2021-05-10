@@ -1,10 +1,11 @@
 import os
+import sys
 from contextlib import contextmanager
 from collections import namedtuple
 
 from cudatext import *
-from cudax_lib import get_translation, get_app_default_opts, OPT2PROP
-FILE_OPTS = OPT2PROP # to check if option can be in file scope
+import cudax_lib as apx
+FILE_OPTS = apx.OPT2PROP # to check if option can be in file scope
 
 import traceback
 
@@ -57,8 +58,14 @@ import time
 file:///mnt/H/cuda/__FM/data/themes/cobalt.cuda-theme-ui
 """
 
-_   = get_translation(__file__)  # I18N
+_   = apx.get_translation(__file__)  # I18N
 
+if os.name=='nt':
+    OS_SUFFIX = ''
+elif sys.platform=='darwin':
+    OS_SUFFIX = '__mac'
+else:
+    OS_SUFFIX = '__linux'
 
 TITLE_DEFAULT = _('CudaText Preferences')
 
@@ -286,10 +293,8 @@ class DialogMK2:
         #TODO get value from options if not present
         ui_max_history_edits = optman.get_scope_value('ui_max_history_edits', scope='u',
                                                         default=ui_max_history_edits)
-        _font_name_opt = optman.get_opt('font_name')
-        _font_size_opt = optman.get_opt('font_size')
-        font_name = optman.get_opt_active_value(_font_name_opt, is_ui=False)
-        font_size = optman.get_opt_active_value(_font_size_opt, is_ui=False)
+        font_name = apx.get_opt('font_name'+OS_SUFFIX)
+        font_size = apx.get_opt('font_size'+OS_SUFFIX)
 
         self._form_rect = {} # dict - x,y,w,h
         self._state = {}
