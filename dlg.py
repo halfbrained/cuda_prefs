@@ -355,8 +355,14 @@ class DialogMK2:
         """
         captions = []
         widths = []
-        _total_w = sum(w for name,w in opt_col_cfg if isinstance(w, int))
-        for caption,w in opt_col_cfg:
+        _col_cfg = opt_col_cfg
+
+        # hide lexer and file scopes  if disabled
+        if self.hidden_columns:
+            _col_cfg = [colcfg for colcfg in _col_cfg  if colcfg[0] not in self.hidden_columns]
+
+        _total_w = sum(w for name,w in _col_cfg if isinstance(w, int))
+        for caption,w in _col_cfg:
             captions.append(caption)
 
             # width: to negative percentages for listbox -- except '!' <- in px
@@ -367,6 +373,17 @@ class DialogMK2:
             widths.append(w)
 
         return captions,widths
+
+    @property
+    def hidden_columns(self):
+        if not hasattr(self, '_hidden_columns'):
+            self._hidden_columns = set()
+
+            if self.hidden_scopes:
+                if 'l' in self.hidden_scopes:   self._hidden_columns.add(COL_VAL_LEX)
+                if 'f' in self.hidden_scopes:   self._hidden_columns.add(COL_VAL_FILE)
+
+        return self._hidden_columns
 
     @property
     def scope(self):
@@ -420,13 +437,6 @@ class DialogMK2:
                 _col_cfg = j.get(STATE_KEY_COL_CFG)
                 if _col_cfg:
                     import re
-
-                    # hide lexer and file scopes  if disabled
-                    if self.hidden_scopes:
-                        hidden_columns = set()
-                        if 'l' in self.hidden_scopes:   hidden_columns.add(COL_VAL_LEX)
-                        if 'f' in self.hidden_scopes:   hidden_columns.add(COL_VAL_FILE)
-                        _col_cfg = [col for col in _col_cfg  if col[0] not in hidden_columns]
 
                     # check if only integers and str (~"100px")
                     for i in range(len(_col_cfg)):
@@ -1100,6 +1110,9 @@ class DialogMK2:
                 self._h_col_menu = menu_proc(0, MENU_CREATE)
 
                 for colname in COLS_LIST:
+                    if colname in self.hidden_columns:
+                        continue
+
                     la = lambda col=colname: self.on_toggle_col(col)
                     ui_col_name = ui_column(colname)
                     item_id = menu_proc(self._h_col_menu, MENU_ADD,
