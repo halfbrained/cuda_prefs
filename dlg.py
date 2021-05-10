@@ -492,6 +492,51 @@ class DialogMK2:
 
         json_update(PLING_HISTORY_JSON,  PLING_KEY,  j )
 
+    def configure_columns(self):
+        global opt_col_cfg
+
+        caption = _('Columns widths. In pixels (50px) or relative dimension (100)')
+
+        _colnames, _widths = zip(*opt_col_cfg) # start values
+        colnames, widths = list(_colnames), list(_widths) # working values
+        while True:
+            flat_columns = [str(a)   for item in zip(colnames,widths)   for a in item]
+            res = dlg_input_ex(len(colnames), caption, *flat_columns)
+            if not res:
+                break
+            else: # have result -> validate
+                for i in range(len(colnames)):
+                    item = res[i]
+                    if item.isdecimal():
+                        res[i] = int(item)
+                    elif (item.endswith('px') and item[:-2].isdecimal()):
+                        pass
+                    else: # error
+                        widths = res
+                        colnames[i] = _colnames[i] + _(' (Error!)')
+                        break
+
+                else: # all is well - stop `While`
+                    break
+
+        if res:
+            new_cfg = list(zip(_colnames, res))
+            _start_cfg = opt_col_cfg[:]
+
+            # try to apply new config -- revert if failed (jic)
+            try:
+                opt_col_cfg = new_cfg  # global
+
+                self.update_list_layout()
+                _opts = self.get_filtered_opts()
+                self.update_list(_opts)
+            except Exception as ex:
+                opt_col_cfg = _start_cfg  # revert changes
+
+                msg = _('failed to apply new columns config: {}. {}').format(new_cfg, ex)
+                print('NOTE: {}: {}'.format(self.title, msg))
+
+
 
     def show(self):
         if not self.h:
@@ -1120,7 +1165,13 @@ class DialogMK2:
 
                     _enabled = colname != COL_OPT_NAME # 'option name' column - always shown
                     menu_proc(item_id, MENU_SET_ENABLED, command=_enabled)
+
+                menu_proc(self._h_col_menu, MENU_ADD, caption='-')
+
+                la = lambda: self.configure_columns()
+                menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=_('Configure'))
             #end if
+
 
             # update check state
             current_columns, _col_ws = self.columns
