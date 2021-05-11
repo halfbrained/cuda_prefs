@@ -833,7 +833,7 @@ class OptionsMan:
             return None
 
         override_str = opt['!']
-        override_str = override_str.replace('+', '')
+        override_str = override_str.replace('+', '').replace('L', '')
         if override_str == '': # default
             res = opt['jdf']  if is_ui else  opt['def']
             scope = ''
@@ -842,13 +842,15 @@ class OptionsMan:
             res = opt['juvl']  if is_ui else  opt['uval']
             scope = 'u'
 
-        elif override_str == '!!'  or  override_str == 'L': # lexer
+        elif override_str == '!!': # lexer
             res = opt['jlvl']  if is_ui else  opt['lval']
             scope = 'l'
 
-        elif len(override_str) == 3: # file
+        elif override_str == '!!!': # file
             res = opt['jfvl']  if is_ui else  opt['fval']
             scope = 'f'
+        else:
+            raise Exception('Unsupported override-str:{}\n+ {}'.format(opt['!'], opt))
         #end if
 
         return (scope, res)  if with_scope else  res
