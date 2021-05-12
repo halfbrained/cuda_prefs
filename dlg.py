@@ -104,6 +104,7 @@ PAD = 2
 COL_FONT = 0
 COL_SPLITTER = 0
 
+GLOBAL_OP_CMT = 'Note: this option is global'
 TREE_ITEM_ALL = _('[ All ]')
 
 # columns
@@ -1425,14 +1426,19 @@ class ValueEds:
             print(_('PreferenesError: unsupported option type: ')+str(newtype))
             return
 
+
         # disable option editing?  (some options cannot be a file opt)
-        if scope == 'f'  and  not opt['opt'] in FILE_OPTS:
-            pass;       LOG and print('NOTE: not file option: disabling')
+        if scope == 'f'  and  not opt['opt'] in FILE_OPTS \
+                or  scope == 'l'  and  GLOBAL_OP_CMT in opt['cmt']:
+
+            pass;       LOG and print('NOTE: option NA: disabling')
             n = self._wgt_ind(h, M.type_map['str'], show=True) # ~resets wgt props
             self._current_type = 'str'
+
+            hint = _('Not available for a file')  if scope=='f' else  _('Not available for lexers')
             dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                     'en': False,
-                    'texthint': _('Not available for a file')
+                    'texthint': hint,
                     })
             with ignore_edit(h, self.val_edit):
                 self.val_edit.set_text_all('')
@@ -1532,7 +1538,7 @@ class ValueEds:
             'a_t': (M.VALUE_ED_RESET, '['),
             'a_r': (M.VALUE_ED_RESET, '['),
             'a_b': (M.VALUE_ED_RESET, ']'),
-            'sp_l': PAD,
+            #'sp_l': PAD,
             'act': True, 'en': True,
         }
 
