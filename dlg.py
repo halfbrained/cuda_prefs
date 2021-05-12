@@ -97,6 +97,7 @@ VK_ESCAPE = 27
 LIST_SEP = chr(1)
 
 BTN_H = app_proc(PROC_GET_GUI_HEIGHT, 'button')
+BTN_W = BTN_H*3
 PAD = 2
 
 # colores
@@ -312,7 +313,7 @@ class DialogMK2:
         self._last_applied_filter = None
         self._cur_opt_name = None
 
-        self.h = None
+        self.h = None   # reset to None when dlg exited
         self._h_tree = None
         self._h_col_menu = None
         self._h_help = None
@@ -461,6 +462,9 @@ class DialogMK2:
 
 
     def _save_dlg_cfg(self):
+        if self.h is None:
+            return
+
         # window position/dimensions
         form_prop = dlg_proc(self.h, DLG_PROP_GET)
         j_form = {'x':form_prop['x'], 'y':form_prop['y'], 'w':form_prop['w'], 'h':form_prop['h']}
@@ -489,7 +493,7 @@ class DialogMK2:
     def configure_columns(self):
         global opt_col_cfg
 
-        caption = _('Columns widths. In pixels (50px) or relative dimension (100)')
+        caption = _('Columns widths. In pixels (50px) or relative (100)')
 
         _colnames, _widths = zip(*opt_col_cfg) # start values
         colnames, widths = list(_colnames), list(_widths) # working values
@@ -569,6 +573,9 @@ class DialogMK2:
                         'globals()["dlg"] = DialogMK2._dlg',]
             app_proc(PROC_EXEC_PYTHON, '\n'.join(cmds))
             del DialogMK2._dlg
+
+            dlg_proc(self.h, DLG_SHOW_NONMODAL)
+            return
         ###########
 
         dlg_proc(self.h, DLG_SHOW_MODAL)
@@ -583,13 +590,6 @@ class DialogMK2:
         colors = app_proc(PROC_THEME_UI_DICT_GET, '')
         COL_FONT = colors['EdTextFont']['color']
         COL_SPLITTER = colors['SplitMain']['color']
-        #COL_SPLITTER = colors['ScrollFill']['color']
-        #COL_SPLITTER = colors['EdBorderFocused']['color']
-        #COL_SPLITTER = colors['EdTextFont']['color']
-        #COL_SPLITTER = colors['ButtonBorderOver']['color']
-        #color_form_bg = colors['TabPassive']['color']
-        #color_form_bg = colors['EdTextBg']['color']
-        color_form_bg = colors['ButtonBorderPassive']['color']
         color_form_bg = colors['TabBg']['color']
 
         ###### FORM #######################
@@ -602,6 +602,7 @@ class DialogMK2:
                 'keypreview': True,
                 'on_key_down': self._on_key,
                 'on_close': lambda *args, **vargs: self._save_dlg_cfg(),
+                'topmost': True,
                 })
 
         ###### MAIN PANEL
@@ -718,7 +719,7 @@ class DialogMK2:
                 'name': ValueEds.VALUE_ED_RESET,
                 'p': 'panel_value',
                 'h': BTN_H, 'max_h': BTN_H,
-                'w': 60, 'max_w': 60,
+                'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None,   'a_r': ('scope_label', '['),  'a_t': ('', '['),
                 'sp_l': PAD, 'sp_r': 32,
                 'cap': _('Reset'),
@@ -762,7 +763,7 @@ class DialogMK2:
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'name': 'btn_ok',
                 'h': BTN_H, 'max_h': BTN_H,
-                'w': 60, 'max_w': 60,
+                'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None, 'a_t': None, 'a_r': ('', ']'),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
                 'cap': _('OK'),
@@ -773,7 +774,7 @@ class DialogMK2:
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'name': 'btn_apply',
                 'h': BTN_H, 'max_h': BTN_H,
-                'w': 60, 'max_w': 60,
+                'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_ok', '['),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
                 'cap': _('Apply'),
@@ -783,7 +784,7 @@ class DialogMK2:
         n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'h': BTN_H, 'max_h': BTN_H,
-                'w': 60, 'max_w': 60,
+                'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_apply', '['),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
                 'cap': _('Close'),
@@ -793,7 +794,7 @@ class DialogMK2:
         n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                 'h': BTN_H, 'max_h': BTN_H,
-                'w': 60, 'max_w': 60,
+                'w': BTN_W, 'max_w': BTN_W,
                 'a_l': ('', '['),  'a_t': None, 'a_r': None, 'a_b': ('', ']'),
                 'sp_l': PAD*2, 'sp_b': PAD*2,
                 'cap': _('Help'),
@@ -1007,19 +1008,40 @@ class DialogMK2:
 
 
     def on_opt_val_edit(self, id_dlg, id_ctl, data='', info=''):
+        """ "change" callback for: option-edit field, 'edit-value' btn
+        """
+
         ed_name = self.val_eds.get_name(id_ctl)
         prop_type = self._cur_opt['frm']
         pass;       LOG and print(' + ed name: {} [{}]'.format(ed_name, prop_type))
 
-        if ed_name == ValueEds.WGT_NAME__EDIT: # str, int, float, -hotk
+        if ed_name == ValueEds.WGT_NAME__EDIT:       # str, int, float, -hotk  + ###
+            if prop_type == '#rgb'  or  prop_type == '#rgb-e':
+                self._update_rgb_edit()
+
             key_code, key_state = data
             if key_code != VK_ENTER:
                 return
-            val = self.val_eds.val_edit.get_text_all()
-            if   prop_type == 'int':     val = int(val)
-            elif prop_type == 'float':   val = float(val)
 
-        elif ed_name == ValueEds.WGT_NAME__COMBO: # font, int2s, str2s, strs
+            val = self.val_eds.val_edit.get_text_all()
+            if   prop_type == 'int':
+                val = int(val)
+            elif prop_type == 'float':
+                val = float(val)
+            elif prop_type in {'#rgb', '#rgb-e'}:
+                if val == '':
+                    if prop_type != '#rgb-e':
+                        msg_status(_('Option "{}" does not accept empty value').format(self._cur_opt_name))
+                        return
+                else:
+                    try:
+                        apx.html_color_to_int(val)
+                    except:
+                        msg_status(_('Incorrect color token: ') + val)
+                        return
+
+
+        elif ed_name == ValueEds.WGT_NAME__COMBO:   # font, int2s, str2s, strs ###
             val = self.val_eds.val_combo.get_text_all()
             # only accept values from combo-items
             if val not in self.val_eds.val_combo.get_prop(PROP_COMBO_ITEMS):
@@ -1028,16 +1050,24 @@ class DialogMK2:
 
             val = map_option_value(self._cur_opt, caption=val)
 
-        elif ed_name == ValueEds.WGT_NAME__CHECK: # bool
+        elif ed_name == ValueEds.WGT_NAME__CHECK:                       # bool ###
             props = dlg_proc(self.h, DLG_CTL_PROP_GET, index=id_ctl)
             val = props.get('val')
             val = True if val=='1' else  (False if val=='0' else  None)
 
-        elif ed_name == ValueEds.WGT_NAME__BTN_HOTKEY: # hotkey btn
-            hotkey = dlg_hotkey(title=self._cur_opt_name)
-            val = hotkey
+        elif ed_name == ValueEds.WGT_NAME__BTN_EDIT: # edit btn: hotk, color, json, file ###
+            val = self._dlg_value(prop_type)
+            if val is not None:
+                with ignore_edit(self.h, self.val_eds.val_edit):
+                    self.val_eds.val_edit.set_text_all(str(val))
+
+                if prop_type in {'#rgb', '#rgb-e'}:
+                    self._update_rgb_edit()
+            else: # canceled dialog
+                return
 
         self.add_opt_change(self._cur_opt_name, self.scope, val)
+
 
     def _on_opt_click(self, id_dlg, id_ctl, data='', info=''):
         #print('LIST CIKCK: {}'.format((id_dlg, id_ctl, data, info)))
@@ -1085,6 +1115,11 @@ class DialogMK2:
         with ignore_edit(self.h, self.scope_ed):
             self.scope_ed.set_text_all(new_scope_name)
         self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=active_scoped_val)
+
+        # rgb stuff
+        prop_type = self._cur_opt['frm']
+        if prop_type in {'#rgb', '#rgb-e'}:
+            self._update_rgb_edit()
 
 
     def _on_reset(self, id_dlg, id_ctl, data='', info=''):
@@ -1208,6 +1243,47 @@ class DialogMK2:
 
         self.val_eds.clear_edits(self.h)
 
+    def _dlg_value(self, prop_type):
+        """ editing option value with a dialog
+            returns: new value
+        """
+
+        if prop_type == 'hotk':    # HOTKEY
+            val = dlg_hotkey(title=self._cur_opt_name)
+
+        elif prop_type in {'#rgb', '#rgb-e'}:  # RGB;  val == None or correct html color
+            # empty ('-e') -- only for edit field
+            cur_scol = self.val_eds.val_edit.get_text_all()
+            try:
+                int_col = apx.html_color_to_int(cur_col)
+            except:
+                int_col = 0xffffff
+
+            val = dlg_color(int_col)
+
+            print(f' dlg color: {str(val)}')
+            if val is not None:
+                try:
+                    val = apx.int_to_html_color(val)
+
+                    print(f' proper color: {val}')
+                except:
+                    print(f' Exception color!')
+                    val = None
+
+        elif prop_type == 'file':
+            caption = _('Choose file: {}').format(self._cur_opt_name)
+            val = dlg_file(is_open=False, init_filename='', init_dir='', filters='', caption=caption)
+
+        elif prop_type == 'json':
+            from .dlg_json import JsonEd
+
+            j_ed = JsonEd(self._cur_opt, self.scope)
+            val = j_ed.edit_json()
+        #end if
+
+        return val
+
 
     def toggle_filter(self, show=False):
         #dlg_proc(self.h, DLG_CTL_PROP_SET, name='panel_filter', prop={'vis': show})
@@ -1239,6 +1315,15 @@ class DialogMK2:
         self.optman.on_opts_change()
         _opts = self.get_filtered_opts()
         self.update_list(_opts)
+
+    def _update_rgb_edit(self, tag='', info=''):
+        """ empty tag - ques in timer
+        """
+        if not tag:
+            timer_proc(TIMER_START_ONE, self._update_rgb_edit, 100, tag='on_timer')
+        else:
+            if self.h is not None:
+                ValueEds.update_ed_color(self.val_eds.val_edit)
 
     def dlg_help(self, *args, **vargs):
         if self._h_help == None:
@@ -1276,8 +1361,10 @@ class DialogMK2:
     def close(self):
         self._save_dlg_cfg()
 
-        dlg_proc(self.h, DLG_HIDE)
-        #dlg_proc(self.h, DLG_FREE)
+        h = self.h
+        self.h = None
+
+        dlg_proc(h, DLG_HIDE)
 
 
 class ValueEds:
@@ -1291,7 +1378,7 @@ class ValueEds:
     WGT_NAME__COMBO      = 'cur_val__combo'
     WGT_NAME__CHECK      = 'cur_val__check'
 
-    WGT_NAME__BTN_HOTKEY = 'cur_val__hotkey'
+    WGT_NAME__BTN_EDIT   = 'cur_val__edit_btn'
 
     type_map = {
         'str':      WGT_NAME__EDIT,
@@ -1304,6 +1391,11 @@ class ValueEds:
         'int2s':    WGT_NAME__COMBO,
         'str2s':    WGT_NAME__COMBO,
         'strs':     WGT_NAME__COMBO,
+
+        '#rgb':     WGT_NAME__EDIT,
+        '#rgb-e':   WGT_NAME__EDIT,
+        'file':     WGT_NAME__EDIT,
+        'json':     WGT_NAME__EDIT,
     }
 
     def __init__(self, val_change_callback):
@@ -1365,21 +1457,11 @@ class ValueEds:
             with ignore_edit(h, self.val_combo):
                 self.val_combo.set_text_all(value)
 
-
         elif newtype == 'hotk':
             self.val_edit.set_text_all(value)
             self.val_edit.set_prop(PROP_RO, True)
 
-            ## anchors, hotk btn
-            btn_n = self._wgt_ind(h, M.WGT_NAME__BTN_HOTKEY, show=True)
-            dlg_proc(h, DLG_CTL_PROP_SET, index=btn_n, prop={
-                    'a_l': None,       'a_r': (M.VALUE_ED_RESET, '['),
-                    'w': 32, 'max_w': 32, 'sp_l': 2,
-            })
-            # ... edit
-            dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
-                    'a_l': ('', '['),       'a_r': (M.WGT_NAME__BTN_HOTKEY, '[')
-            })
+            self.layout_ed_btn(h, n, '...')
 
         elif newtype == 'int':
             self.val_edit.set_text_all(str(value))
@@ -1401,6 +1483,26 @@ class ValueEds:
             with ignore_edit(h, self.val_combo):
                 self.val_combo.set_text_all(value)
             self.val_combo.set_prop(PROP_COMBO_ITEMS, '\n'.join(opt['lst']))
+
+        elif newtype == '#rgb-e'  or  newtype == '#rgb':
+            self.val_edit.set_text_all(str(value))
+
+            self.val_edit.set_prop(PROP_GUTTER_ALL, True)
+            self.val_edit.set_prop(PROP_GUTTER_STATES, False)
+            self.val_edit.set_prop(PROP_GUTTER_NUM, False)
+
+            self.layout_ed_btn(h, n, '...')
+
+        elif newtype == 'file':
+            self.val_edit.set_text_all(str(value))
+
+            self.layout_ed_btn(h, n, _('Choose file...'))
+
+        elif newtype == 'json':
+            self.val_edit.set_text_all(str(value))
+            self.val_edit.set_prop(PROP_RO, True)
+
+            self.layout_ed_btn(h, n, _('Edit...'))
         #end if
 
         self._current_type = newtype
@@ -1483,7 +1585,7 @@ class ValueEds:
                 self._ctl_names[n] = name
 
         # Extra
-        elif name == M.WGT_NAME__BTN_HOTKEY:
+        elif name == M.WGT_NAME__BTN_EDIT:
             n = dlg_proc(h, DLG_CTL_FIND, prop=name)
             if n == -1:     # add if not already
                 n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
@@ -1509,15 +1611,40 @@ class ValueEds:
         to_hide = [M.type_map[self._current_type]]
 
         if self._current_type == 'hotk':
-            to_hide.append(M.WGT_NAME__BTN_HOTKEY)
+            to_hide.append(M.WGT_NAME__BTN_EDIT)
 
         for name in to_hide:
             dlg_proc(h, DLG_CTL_PROP_SET, name=name, prop={'vis':False})
 
+    def layout_ed_btn(self, h, n, caption):
+        M = ValueEds
+
+        w = int(BTN_W*0.5) if caption == '...' else BTN_W
+
+        btn_n = self._wgt_ind(h, M.WGT_NAME__BTN_EDIT, show=True)
+        dlg_proc(h, DLG_CTL_PROP_SET, index=btn_n, prop={
+                'a_l': None,       'a_r': (M.VALUE_ED_RESET, '['),
+                'w': w, 'max_w': w, 'sp_l': 2,
+                'cap': caption,
+        })
+        # ... edit
+        dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
+                'a_l': ('', '['),       'a_r': (M.WGT_NAME__BTN_EDIT, '[')
+        })
+
+    def update_ed_color(edt):
+        try:
+            int_col = apx.html_color_to_int(edt.get_text_all())
+        except:     # invalid color -> reset to theme color
+            colors = app_proc(PROC_THEME_UI_DICT_GET, '')
+            int_col = colors['EdGutterBg']['color']
+        edt.set_prop(PROP_COLOR, (COLOR_ID_GutterBg, int_col))
+
+
     def reset_edt(edt):
         edt.set_prop(PROP_NUMBERS_ONLY, False)
         edt.set_prop(PROP_RO, False)
-
+        edt.set_prop(PROP_GUTTER_ALL, False)
 
 class OptionMapValueError(Exception):
     pass
