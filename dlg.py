@@ -309,8 +309,9 @@ class DialogMK2:
 
         self._load_dlg_cfg()
 
-        self.current_sort = self._state.get(STATE_KEY_SORT_COL, COL_OPT_NAME)
-        self.sort_reverse = False
+        _sort_val = self._state.get(STATE_KEY_SORT_COL, COL_OPT_NAME)
+        self.current_sort = _sort_val.lstrip('-')
+        self.sort_reverse = _sort_val.startswith('-')
         self._last_applied_filter = None
         self._cur_opt_name = None
 
@@ -478,7 +479,7 @@ class DialogMK2:
         j[STATE_KEY_FILTER_STR] = self.filter_val
         j[STATE_KEY_FILTER_HIST] = filter_history
         j[STATE_KEY_FILTER_VISIBLE] = dlg_proc(self.h, DLG_CTL_PROP_GET, name='panel_filter')['vis']
-        j[STATE_KEY_SORT_COL] = self.current_sort
+        j[STATE_KEY_SORT_COL] = self.current_sort if not self.sort_reverse else '-'+self.current_sort
         j[STATE_KEY_SEL_OPT] = self._cur_opt_name
 
         # save some options separately -- 3rd party options: move from `j` to `j/subsets/<subset>`
