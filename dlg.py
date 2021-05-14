@@ -1129,12 +1129,21 @@ class DialogMK2:
         """ remove option for current scope
         """
         self.add_opt_change(self._cur_opt_name, self.scope, val=None)
+        # update value for current scope
+        self._on_scope_change(-1,-1)
 
     def _on_scope_change(self, id_dlg, id_ctl, data='', info=''):
         if not self._cur_opt:
             return
 
-        cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
+        # check if have 'value' for 'scope' in ._opt_changes
+        for opt_change in reversed(self._opt_changes):
+            if opt_change.name == self._cur_opt_name  and  opt_change.scope == self.scope:
+                cur_scope_val = opt_change.value  or  ''
+                break
+        else:
+            cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
+
         pass;       LOG and print(' -- scoped val:{}:[{}]'.format(self.scope, cur_scope_val))
 
         self.val_eds.set_type(self.h,  self._cur_opt, scoped_val=(self.scope, cur_scope_val))
