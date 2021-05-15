@@ -791,7 +791,7 @@ class DialogMK2:
                 'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_apply', '['),  'a_b': ('', ']'),
                 'sp_r': PAD*2, 'sp_b': PAD*2,
-                'cap': _('Close'),
+                'cap': _('Cancel'),
                 'on_change': lambda *args, **vargs: self.close(),
                 })
         # help #######
