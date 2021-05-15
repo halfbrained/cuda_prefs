@@ -314,8 +314,9 @@ class DialogMK2:
         self.sort_reverse = _sort_val.startswith('-')
         self._last_applied_filter = None
         self._cur_opt_name = None
+        self._closing = False
 
-        self.h = None   # reset to None when dlg exited
+        self.h = None
         self._h_tree = None
         self._h_col_menu = None
         self._h_help = None
@@ -464,7 +465,7 @@ class DialogMK2:
 
 
     def _save_dlg_cfg(self):
-        if self.h is None:
+        if self._closing is None:
             return
 
         # window position/dimensions
@@ -1334,7 +1335,7 @@ class DialogMK2:
         if not tag:
             timer_proc(TIMER_START_ONE, self._update_rgb_edit, 100, tag='on_timer')
         else:
-            if self.h is not None:
+            if self._closing is not None:
                 ValueEds.update_ed_color(self.val_eds.val_edit)
 
     def dlg_help(self, *args, **vargs):
@@ -1373,10 +1374,9 @@ class DialogMK2:
     def close(self):
         self._save_dlg_cfg()
 
-        h = self.h
-        self.h = None
+        self._closing = True
 
-        dlg_proc(h, DLG_HIDE)
+        dlg_proc(self.h, DLG_HIDE)
 
 
 class ValueEds:
