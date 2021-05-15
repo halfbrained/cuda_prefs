@@ -978,6 +978,8 @@ class DialogMK2:
         """ val=None -- remove option binding for scope
         """
         _old_val = self.optman.get_scope_value(name, scope)
+
+        # check if already have a opt_change for this option+scope -> ovewrite (delete old)
         for i,change in enumerate(self._opt_changes):
             if change.name == name and change.scope == scope:
                 del self._opt_changes[i]
@@ -1014,7 +1016,6 @@ class DialogMK2:
     def on_opt_val_edit(self, id_dlg, id_ctl, data='', info=''):
         """ "change" callback for: option-edit field, 'edit-value' btn
         """
-
         ed_name = self.val_eds.get_name(id_ctl)
         prop_type = self._cur_opt['frm']
         pass;       LOG and print(' + ed name: {} [{}]'.format(ed_name, prop_type))
@@ -1027,23 +1028,9 @@ class DialogMK2:
             if key_code != VK_ENTER:
                 return
 
-            val = self.val_eds.val_edit.get_text_all()
-            if   prop_type == 'int':
-                val = int(val)
-            elif prop_type == 'float':
-                val = float(val)
-            elif prop_type in {'#rgb', '#rgb-e'}:
-                if val == '':
-                    if prop_type != '#rgb-e':
-                        msg_status(_('Option "{}" does not accept empty value').format(self._cur_opt_name))
-                        return
-                else:
-                    try:
-                        apx.html_color_to_int(val)
-                    except:
-                        msg_status(_('Incorrect color token: ') + val)
-                        return
-
+            val = self.val_eds.get_edited_value(self._cur_opt)
+            if val is None:
+                return
 
         elif ed_name == ValueEds.WGT_NAME__COMBO:   # font, int2s, str2s, strs ###
             val = self.val_eds.val_combo.get_text_all()
@@ -1311,6 +1298,14 @@ class DialogMK2:
         """
         pass;       LOG and print('APPLY_CHANGES')
 
+        # check if current value in edit is changed, create option change if it is
+        try:
+            edit_val = self.val_eds.get_edited_value(self._cur_opt)
+        except ValueError:      # exception happens when trying to cast empty str to float|int
+            edit_val = None
+        if edit_val is not None  and  edit_val != '':
+            self.add_opt_change(self._cur_opt_name, self.scope, edit_val)
+
         if not self._opt_changes  and  not closing:
             msg_status(_("No option changes has been made"))
             return
@@ -1383,6 +1378,7 @@ class ValueEds:
     """ * Responsible for: widgets for editing different value formats
         * Formats: bool, float, font, font-e, hotk, int, int2s, str, str2s, strs,
     """
+
     VALUE_ED_PANEL = 'panel_value'
     VALUE_ED_RESET = 'btn_val_reset'
 
@@ -1409,6 +1405,8 @@ class ValueEds:
         'file':     WGT_NAME__EDIT,
         'json':     WGT_NAME__EDIT,
     }
+
+    EXTRA_BTN_TYPES = {'hotk', '#rgb', '#rgb-e', 'file', 'json'}
 
     def __init__(self, val_change_callback):
         self._val_change_callback = val_change_callback
@@ -1534,6 +1532,36 @@ class ValueEds:
     def get_name(self, id_ctl):
         return self._ctl_names.get(id_ctl)
 
+    def get_edited_value(self, opt):
+        """ if 'WGT_NAME__EDIT' is current editor - return parsed value
+            else None
+
+        """
+        M = ValueEds
+
+        type_wgt_name = M.type_map[self._current_type]
+
+        if type_wgt_name == M.WGT_NAME__EDIT:
+            val = self.val_edit.get_text_all()
+
+            prop_type = opt['frm']
+            if prop_type == 'int':
+                val = int(val)
+            elif prop_type == 'float':
+                val = float(val)
+            elif prop_type in {'#rgb', '#rgb-e'}:
+                if val == '':
+                    if prop_type != '#rgb-e':
+                        msg_status(_('Option "{}" does not accept empty value').format(opt['opt']))
+                        return
+                else:
+                    try:
+                        apx.html_color_to_int(val)
+                    except:
+                        msg_status(_('Incorrect color token: ') + val)
+                        return
+            return val
+
 
     def _wgt_ind(self, h, name, show=False):
         """ creates widget if didn't exist
@@ -1627,7 +1655,7 @@ class ValueEds:
 
         to_hide = [M.type_map[self._current_type]]
 
-        if self._current_type == 'hotk':
+        if self._current_type in M.EXTRA_BTN_TYPES:
             to_hide.append(M.WGT_NAME__BTN_EDIT)
 
         for name in to_hide:
