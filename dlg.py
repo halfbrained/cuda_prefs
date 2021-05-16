@@ -1042,9 +1042,7 @@ class DialogMK2:
             val = map_option_value(self._cur_opt, caption=val)
 
         elif ed_name == ValueEds.WGT_NAME__CHECK:                       # bool ###
-            props = dlg_proc(self.h, DLG_CTL_PROP_GET, index=id_ctl)
-            val = props.get('val')
-            val = True if val=='1' else  (False if val=='0' else  None)
+            val = self.val_eds.cb_value
 
         elif ed_name == ValueEds.WGT_NAME__BTN_EDIT: # edit btn: hotk, color, json, file ###
             val = self._dlg_value(prop_type)
@@ -1378,7 +1376,6 @@ class ValueEds:
     """ * Responsible for: widgets for editing different value formats
         * Formats: bool, float, font, font-e, hotk, int, int2s, str, str2s, strs,
     """
-
     VALUE_ED_PANEL = 'panel_value'
     VALUE_ED_RESET = 'btn_val_reset'
 
@@ -1408,15 +1405,31 @@ class ValueEds:
 
     EXTRA_BTN_TYPES = {'hotk', '#rgb', '#rgb-e', 'file', 'json'}
 
+    FN_CHECKBOX_ICONS = {
+        False: 'cb_unckecked.png',
+        None:  'cb_none.png',
+        True:  'cb_checked.png',
+    }
+
     def __init__(self, val_change_callback):
         self._val_change_callback = val_change_callback
         self._ctl_names = {} # id_ctl -> name
+        self._cb_icons = {} # False, None, True -> imagelist index
         self._current_type = None
         self.val_edit = None
         self.val_combo = None
 
         self._ignore_input = False
 
+    @property
+    def cb_value(self):
+        """ returns True, False, None
+        """
+        imind = button_proc(self._h_cbx, BTN_GET_IMAGEINDEX)
+
+        for val,ind in self._cb_icons.items():
+            if ind == imind:
+                return val
 
     def set_type(self, h, opt, scoped_val):
         M = ValueEds
@@ -1426,7 +1439,7 @@ class ValueEds:
         newtype = opt.get('frm')
 
         pass;       LOG and print('* SET type-value-ed: type:{}, val:{}'.format(
-                                                                        newtype, (scope, value)))
+                                                                        newtype, (scope, value, type(value))))
 
         self._hide_val_ed(h)
 
@@ -1462,7 +1475,12 @@ class ValueEds:
             self.val_edit.set_text_all(value or '')
 
         elif newtype == 'bool':
-            dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={'val': value})
+            #NOTE: UI bool values are: True, False, and '' for empty scope value
+            if   value is True:  imind = self._cb_icons[value]
+            elif value is False: imind = self._cb_icons[value]
+            else:                imind = self._cb_icons[None]
+
+            button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, imind)
 
         elif newtype == 'float':
             self.val_edit.set_text_all(str(value) or '')
@@ -1618,16 +1636,28 @@ class ValueEds:
         elif name == M.WGT_NAME__CHECK:
             n = dlg_proc(h, DLG_CTL_FIND, prop=name)
             if n == -1:     # add if not already
-                n = dlg_proc(h, DLG_CTL_ADD, 'check')
+                n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
                 dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                         **default_props,
                         'cap': _('Enable'),
                         'act': True,
-                        'on_change': self._val_change_callback,
-                        'val': '?', # to get thirt state '?' into rotation
+                        'on_change': self._on_cb_click_proxy,
                         'font_color': COL_FONT,
                         })
+                self._h_cbx = dlg_proc(h, DLG_CTL_HANDLE, index=n)
                 self._ctl_names[n] = name
+
+                button_proc(self._h_cbx, BTN_SET_FLAT, True)
+                button_proc(self._h_cbx, BTN_SET_KIND, BTNKIND_TEXT_ICON_HORZ)
+                # icons  (checkbox)
+                h_iml = imagelist_proc(0, IMAGELIST_CREATE)
+                _icons_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icons')
+                for k,fn_icon in M.FN_CHECKBOX_ICONS.items():
+                    _path = os.path.join(_icons_dir, fn_icon)
+                    imind = imagelist_proc(h_iml, IMAGELIST_ADD, _path)
+                    self._cb_icons[k] = imind
+                button_proc(self._h_cbx, BTN_SET_IMAGELIST, h_iml)
+            #end if
 
         # Extra
         elif name == M.WGT_NAME__BTN_EDIT:
@@ -1660,6 +1690,19 @@ class ValueEds:
 
         for name in to_hide:
             dlg_proc(h, DLG_CTL_PROP_SET, name=name, prop={'vis':False})
+
+    def _on_cb_click_proxy(self, id_dlg, id_ctl, data='', info=''):
+        """ changes button_ex checkbox icon to proper value, and sends control click to default callback
+        """
+        cb_val = self.cb_value
+        # cycle: True => False => None   => True...
+        if   cb_val is True:  nextind = self._cb_icons[False]
+        elif cb_val is False: nextind = self._cb_icons[None]
+        else:                 nextind = self._cb_icons[True]
+
+        button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, nextind)
+
+        self._val_change_callback(id_dlg, id_ctl, data, info)
 
     def layout_ed_btn(self, h, n, caption):
         M = ValueEds
