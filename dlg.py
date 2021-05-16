@@ -159,6 +159,15 @@ font_size = None
 
 filter_history = []
 
+def load_imagelist(ic_filename_map):
+    ind_map = {}
+    h_iml = imagelist_proc(0, IMAGELIST_CREATE)
+    _icons_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icons')
+    for name,fn_icon in ic_filename_map.items():
+        _path = os.path.join(_icons_dir, fn_icon)
+        imind = imagelist_proc(h_iml, IMAGELIST_ADD, _path)
+        ind_map[name] = imind
+    return h_iml, ind_map
 
 def get_tree_path_names(h_tree, item_id, l=None):
     ''' returns list, node names starting with deepest
@@ -271,6 +280,9 @@ def ui_column(colname):
 
 class DialogMK2:
 
+    _h_list_iml = None # handle for option-list's imagelist
+    _lb_icon_inds = {} # listbox icons
+
     def __init__(self, optman, title=None, subset=None, how=None):
         """ optman -- cd_opts_dlg.py/OptionsMan
             how --
@@ -325,8 +337,6 @@ class DialogMK2:
         self.val_eds = ValueEds(self.on_opt_val_edit)
 
         self._opt_changes = []
-        self._head_spls = [] # inds
-        self._lb_icon_inds = {} # listbox icons
         self._list_opt_names = [] # current displayed list of option-names
         # '' -> User -- showing default value, edited value will be added to 'user' scope
         self._col_toggle_cmds = {} # column name -> toggle lambda -- for menu, to toggle list columns
@@ -586,9 +596,19 @@ class DialogMK2:
         dlg_proc(self.h, DLG_SHOW_MODAL)
         dlg_proc(self.h, DLG_FREE)
 
+        del self.optman
+        del self._list_opt_names
+        del self._col_toggle_cmds
+
     def init_form(self):
         global COL_FONT
         global COL_SPLITTER
+
+        def get_list_imagelist(): #SKIP
+            if not DialogMK2._h_list_iml:
+                DialogMK2._h_list_iml,  DialogMK2._lb_icon_inds = load_imagelist(fn_icons)
+
+            return DialogMK2._h_list_iml
 
         h = dlg_proc(0, DLG_CREATE)
 
@@ -810,12 +830,7 @@ class DialogMK2:
         ### listbox
         listbox_proc(self._h_list, LISTBOX_SET_COLUMN_SEP, text=LIST_SEP)
         # + icons
-        h_iml = imagelist_proc(0, IMAGELIST_CREATE)
-        _icons_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icons')
-        for name,fn_icon in fn_icons.items():
-            _path = os.path.join(_icons_dir, fn_icon)
-            imind = imagelist_proc(h_iml, IMAGELIST_ADD, _path)
-            self._lb_icon_inds[name] = imind
+        h_iml = get_list_imagelist()
         listbox_proc(self._h_list, LISTBOX_SET_HEADER_IMAGELIST, text=h_iml)
 
 
@@ -920,7 +935,7 @@ class DialogMK2:
         if self.current_sort and self.current_sort in column_captions:
             sort_col_ind = column_captions.index(self.current_sort)
             _order_name = 'asc'  if not self.sort_reverse else  'desc'
-            _icon_ind = self._lb_icon_inds[_order_name]
+            _icon_ind = DialogMK2._lb_icon_inds[_order_name]
             header_icon_cfg = [-1]*sort_col_ind + [_icon_ind] # ~[-1, -1, -1, ind]
         listbox_proc(self._h_list, LISTBOX_SET_HEADER_IMAGEINDEXES, text=header_icon_cfg)
 
@@ -1413,10 +1428,12 @@ class ValueEds:
         True:  'cb_checked.png',
     }
 
+    _h_cb_iml = None
+    _cb_icons = {} # False, None, True -> imagelist index
+
     def __init__(self, val_change_callback):
         self._val_change_callback = val_change_callback
         self._ctl_names = {} # id_ctl -> name
-        self._cb_icons = {} # False, None, True -> imagelist index
         self._current_type = None
         self.val_edit = None
         self.val_combo = None
@@ -1429,7 +1446,7 @@ class ValueEds:
         """
         imind = button_proc(self._h_cbx, BTN_GET_IMAGEINDEX)
 
-        for val,ind in self._cb_icons.items():
+        for val,ind in ValueEds._cb_icons.items():
             if ind == imind:
                 return val
 
@@ -1478,9 +1495,9 @@ class ValueEds:
 
         elif newtype == 'bool':
             #NOTE: UI bool values are: True, False, and '' for empty scope value
-            if   value is True:  imind = self._cb_icons[value]
-            elif value is False: imind = self._cb_icons[value]
-            else:                imind = self._cb_icons[None]
+            if   value is True:  imind = ValueEds._cb_icons[value]
+            elif value is False: imind = ValueEds._cb_icons[value]
+            else:                imind = ValueEds._cb_icons[None]
 
             button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, imind)
 
@@ -1652,12 +1669,7 @@ class ValueEds:
                 button_proc(self._h_cbx, BTN_SET_FLAT, True)
                 button_proc(self._h_cbx, BTN_SET_KIND, BTNKIND_TEXT_ICON_HORZ)
                 # icons  (checkbox)
-                h_iml = imagelist_proc(0, IMAGELIST_CREATE)
-                _icons_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icons')
-                for k,fn_icon in M.FN_CHECKBOX_ICONS.items():
-                    _path = os.path.join(_icons_dir, fn_icon)
-                    imind = imagelist_proc(h_iml, IMAGELIST_ADD, _path)
-                    self._cb_icons[k] = imind
+                h_iml = ValueEds._get_checkbox_imagelist()
                 button_proc(self._h_cbx, BTN_SET_IMAGELIST, h_iml)
             #end if
 
@@ -1698,9 +1710,9 @@ class ValueEds:
         """
         cb_val = self.cb_value
         # cycle: True => False => None   => True...
-        if   cb_val is True:  nextind = self._cb_icons[False]
-        elif cb_val is False: nextind = self._cb_icons[None]
-        else:                 nextind = self._cb_icons[True]
+        if   cb_val is True:  nextind = ValueEds._cb_icons[False]
+        elif cb_val is False: nextind = ValueEds._cb_icons[None]
+        else:                 nextind = ValueEds._cb_icons[True]
 
         button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, nextind)
 
@@ -1735,6 +1747,13 @@ class ValueEds:
         edt.set_prop(PROP_NUMBERS_ONLY, False)
         edt.set_prop(PROP_RO, False)
         edt.set_prop(PROP_GUTTER_ALL, False)
+
+    @classmethod
+    def _get_checkbox_imagelist(cls):
+        if not ValueEds._h_cb_iml:
+            ValueEds._h_cb_iml,  ValueEds._cb_icons = load_imagelist(ValueEds.FN_CHECKBOX_ICONS)
+
+        return ValueEds._h_cb_iml
 
 class OptionMapValueError(Exception):
     pass
