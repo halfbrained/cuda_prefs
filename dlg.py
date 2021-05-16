@@ -345,7 +345,9 @@ class DialogMK2:
     @filter_val.setter
     def filter_val(self, value): #SKIP
         if self.h:
-            self._filter_ed.set_text_all(str(value))
+            val_str = str(value)
+            if val_str != self._filter_ed.get_text_all():
+                self._filter_ed.set_text_all(val_str)
 
     @property
     def columns(self):
