@@ -980,6 +980,8 @@ class DialogMK2:
         """ val=None -- remove option binding for scope
         """
         _old_val = self.optman.get_scope_value(name, scope)
+
+        # check if already have a opt_change for this option+scope -> ovewrite (delete old)
         for i,change in enumerate(self._opt_changes):
             if change.name == name and change.scope == scope:
                 del self._opt_changes[i]
@@ -1016,7 +1018,6 @@ class DialogMK2:
     def on_opt_val_edit(self, id_dlg, id_ctl, data='', info=''):
         """ "change" callback for: option-edit field, 'edit-value' btn
         """
-
         ed_name = self.val_eds.get_name(id_ctl)
         prop_type = self._cur_opt['frm']
         pass;       LOG and print(' + ed name: {} [{}]'.format(ed_name, prop_type))
@@ -1029,23 +1030,9 @@ class DialogMK2:
             if key_code != VK_ENTER:
                 return
 
-            val = self.val_eds.val_edit.get_text_all()
-            if   prop_type == 'int':
-                val = int(val)
-            elif prop_type == 'float':
-                val = float(val)
-            elif prop_type in {'#rgb', '#rgb-e'}:
-                if val == '':
-                    if prop_type != '#rgb-e':
-                        msg_status(_('Option "{}" does not accept empty value').format(self._cur_opt_name))
-                        return
-                else:
-                    try:
-                        apx.html_color_to_int(val)
-                    except:
-                        msg_status(_('Incorrect color token: ') + val)
-                        return
-
+            val = self.val_eds.get_edited_value(self._cur_opt)
+            if val is None:
+                return
 
         elif ed_name == ValueEds.WGT_NAME__COMBO:   # font, int2s, str2s, strs ###
             val = self.val_eds.val_combo.get_text_all()
@@ -1057,9 +1044,7 @@ class DialogMK2:
             val = map_option_value(self._cur_opt, caption=val)
 
         elif ed_name == ValueEds.WGT_NAME__CHECK:                       # bool ###
-            props = dlg_proc(self.h, DLG_CTL_PROP_GET, index=id_ctl)
-            val = props.get('val')
-            val = True if val=='1' else  (False if val=='0' else  None)
+            val = self.val_eds.cb_value
 
         elif ed_name == ValueEds.WGT_NAME__BTN_EDIT: # edit btn: hotk, color, json, file ###
             val = self._dlg_value(prop_type)
@@ -1313,6 +1298,14 @@ class DialogMK2:
         """
         pass;       LOG and print('APPLY_CHANGES')
 
+        # check if current value in edit is changed, create option change if it is
+        try:
+            edit_val = self.val_eds.get_edited_value(self._cur_opt)
+        except ValueError:      # exception happens when trying to cast empty str to float|int
+            edit_val = None
+        if edit_val is not None  and  edit_val != '':
+            self.add_opt_change(self._cur_opt_name, self.scope, edit_val)
+
         if not self._opt_changes  and  not closing:
             msg_status(_("No option changes has been made"))
             return
@@ -1412,15 +1405,33 @@ class ValueEds:
         'json':     WGT_NAME__EDIT,
     }
 
+    EXTRA_BTN_TYPES = {'hotk', '#rgb', '#rgb-e', 'file', 'json'}
+
+    FN_CHECKBOX_ICONS = {
+        False: 'cb_unckecked.png',
+        None:  'cb_none.png',
+        True:  'cb_checked.png',
+    }
+
     def __init__(self, val_change_callback):
         self._val_change_callback = val_change_callback
         self._ctl_names = {} # id_ctl -> name
+        self._cb_icons = {} # False, None, True -> imagelist index
         self._current_type = None
         self.val_edit = None
         self.val_combo = None
 
         self._ignore_input = False
 
+    @property
+    def cb_value(self):
+        """ returns True, False, None
+        """
+        imind = button_proc(self._h_cbx, BTN_GET_IMAGEINDEX)
+
+        for val,ind in self._cb_icons.items():
+            if ind == imind:
+                return val
 
     def set_type(self, h, opt, scoped_val):
         M = ValueEds
@@ -1430,7 +1441,7 @@ class ValueEds:
         newtype = opt.get('frm')
 
         pass;       LOG and print('* SET type-value-ed: type:{}, val:{}'.format(
-                                                                        newtype, (scope, value)))
+                                                                        newtype, (scope, value, type(value))))
 
         self._hide_val_ed(h)
 
@@ -1466,7 +1477,12 @@ class ValueEds:
             self.val_edit.set_text_all(value or '')
 
         elif newtype == 'bool':
-            dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={'val': value})
+            #NOTE: UI bool values are: True, False, and '' for empty scope value
+            if   value is True:  imind = self._cb_icons[value]
+            elif value is False: imind = self._cb_icons[value]
+            else:                imind = self._cb_icons[None]
+
+            button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, imind)
 
         elif newtype == 'float':
             self.val_edit.set_text_all(str(value) or '')
@@ -1536,6 +1552,36 @@ class ValueEds:
     def get_name(self, id_ctl):
         return self._ctl_names.get(id_ctl)
 
+    def get_edited_value(self, opt):
+        """ if 'WGT_NAME__EDIT' is current editor - return parsed value
+            else None
+
+        """
+        M = ValueEds
+
+        type_wgt_name = M.type_map[self._current_type]
+
+        if type_wgt_name == M.WGT_NAME__EDIT:
+            val = self.val_edit.get_text_all()
+
+            prop_type = opt['frm']
+            if prop_type == 'int':
+                val = int(val)
+            elif prop_type == 'float':
+                val = float(val)
+            elif prop_type in {'#rgb', '#rgb-e'}:
+                if val == '':
+                    if prop_type != '#rgb-e':
+                        msg_status(_('Option "{}" does not accept empty value').format(opt['opt']))
+                        return
+                else:
+                    try:
+                        apx.html_color_to_int(val)
+                    except:
+                        msg_status(_('Incorrect color token: ') + val)
+                        return
+            return val
+
 
     def _wgt_ind(self, h, name, show=False):
         """ creates widget if didn't exist
@@ -1592,16 +1638,28 @@ class ValueEds:
         elif name == M.WGT_NAME__CHECK:
             n = dlg_proc(h, DLG_CTL_FIND, prop=name)
             if n == -1:     # add if not already
-                n = dlg_proc(h, DLG_CTL_ADD, 'check')
+                n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
                 dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
                         **default_props,
                         'cap': _('Enable'),
                         'act': True,
-                        'on_change': self._val_change_callback,
-                        'val': '?', # to get thirt state '?' into rotation
+                        'on_change': self._on_cb_click_proxy,
                         'font_color': COL_FONT,
                         })
+                self._h_cbx = dlg_proc(h, DLG_CTL_HANDLE, index=n)
                 self._ctl_names[n] = name
+
+                button_proc(self._h_cbx, BTN_SET_FLAT, True)
+                button_proc(self._h_cbx, BTN_SET_KIND, BTNKIND_TEXT_ICON_HORZ)
+                # icons  (checkbox)
+                h_iml = imagelist_proc(0, IMAGELIST_CREATE)
+                _icons_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icons')
+                for k,fn_icon in M.FN_CHECKBOX_ICONS.items():
+                    _path = os.path.join(_icons_dir, fn_icon)
+                    imind = imagelist_proc(h_iml, IMAGELIST_ADD, _path)
+                    self._cb_icons[k] = imind
+                button_proc(self._h_cbx, BTN_SET_IMAGELIST, h_iml)
+            #end if
 
         # Extra
         elif name == M.WGT_NAME__BTN_EDIT:
@@ -1629,11 +1687,24 @@ class ValueEds:
 
         to_hide = [M.type_map[self._current_type]]
 
-        if self._current_type == 'hotk':
+        if self._current_type in M.EXTRA_BTN_TYPES:
             to_hide.append(M.WGT_NAME__BTN_EDIT)
 
         for name in to_hide:
             dlg_proc(h, DLG_CTL_PROP_SET, name=name, prop={'vis':False})
+
+    def _on_cb_click_proxy(self, id_dlg, id_ctl, data='', info=''):
+        """ changes button_ex checkbox icon to proper value, and sends control click to default callback
+        """
+        cb_val = self.cb_value
+        # cycle: True => False => None   => True...
+        if   cb_val is True:  nextind = self._cb_icons[False]
+        elif cb_val is False: nextind = self._cb_icons[None]
+        else:                 nextind = self._cb_icons[True]
+
+        button_proc(self._h_cbx, BTN_SET_IMAGEINDEX, nextind)
+
+        self._val_change_callback(id_dlg, id_ctl, data, info)
 
     def layout_ed_btn(self, h, n, caption):
         M = ValueEds
