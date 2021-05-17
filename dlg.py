@@ -604,6 +604,7 @@ class DialogMK2:
         global COL_FONT
         global COL_SPLITTER
 
+        # load icons only once
         def get_list_imagelist(): #SKIP
             if not DialogMK2._h_list_iml:
                 DialogMK2._h_list_iml,  DialogMK2._lb_icon_inds = load_imagelist(fn_icons)
@@ -1168,7 +1169,16 @@ class DialogMK2:
         if path == TREE_ITEM_ALL:  # show all
             self.set_filter('', tree_click=True)
         else:
-            self.set_filter('@'+path)
+            new_filter = '@'+path
+
+            _keys = app_proc(PROC_GET_KEYSTATE, '')
+            is_adding = set(_keys) == set('cL')
+            if is_adding  and  self.filter_val:
+                if new_filter in self.filter_val.split(): # already in filter - ignore
+                    return
+                new_filter = self.filter_val +' '+ new_filter
+
+            self.set_filter(new_filter)
 
     def _on_header_click(self, id_dlg, id_ctl, data='', info=''):
         pass;       LOG and print('--- Header click-: {}'.format((id_dlg, id_ctl, data, info)))
@@ -1750,6 +1760,7 @@ class ValueEds:
 
     @classmethod
     def _get_checkbox_imagelist(cls):
+        # load icons only once
         if not ValueEds._h_cb_iml:
             ValueEds._h_cb_iml,  ValueEds._cb_icons = load_imagelist(ValueEds.FN_CHECKBOX_ICONS)
 
@@ -1764,7 +1775,7 @@ HELP_TEXT = _("""About "Filter"
  • Add "#" to search the words also in comments.
  • Add "@sec" to show options from section with "sec" in name.
    Several sections are allowed.
-   Click item in menu "Section..." with Ctrl to add it.
+   Click item in sections tree with Ctrl to add it.
  • To show only overridden options:
    - Add "!"   to show only User+Lexer+File.
    - Add "!!"  to show only Lexer+File
