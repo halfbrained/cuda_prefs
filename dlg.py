@@ -124,7 +124,7 @@ UI_COLUMNS = {
     COL_VAL_USER    : _('User'),
     COL_VAL_LEX     : _('Lexer'),
     COL_VAL_FILE    : _('File'),
-    COL_VAL_MAIN    : _('Value'),
+    COL_VAL_MAIN    : _('Current value'),
 }
 
 OPTS_COLUMN_MAP = {
@@ -1156,6 +1156,13 @@ class DialogMK2:
         if isinstance(data, tuple):     # on_key_down
             key_code, key_state = data
             if key_code == VK_ENTER  and  not key_state:
+                # reset tree selection if selected item not in new filter
+                selected_node = tree_proc(self._h_tree, TREE_ITEM_GET_SELECTED)
+                if selected_node:
+                     path = get_tree_path(self._h_tree, item_id=selected_node)
+                     if '@'+path not in self.filter_val.split():
+                        tree_proc(self._h_tree, TREE_ITEM_SELECT, id_item=0)
+
                 _t0 = time.time()
                 self.set_filter(self.filter_val)
                 _t1 = time.time()
@@ -1165,6 +1172,9 @@ class DialogMK2:
             #print('        . CHANGE')
 
     def _on_tree_click(self, id_dlg, id_ctl, data='', info=''):
+        if data == 0:   # deselected items
+            return
+
         path = get_tree_path(self._h_tree, item_id=data)
         if path == TREE_ITEM_ALL:  # show all
             self.set_filter('', tree_click=True)
@@ -1357,6 +1367,7 @@ class DialogMK2:
         else:
             if self._closing is not None:
                 ValueEds.update_ed_color(self.val_eds.val_edit)
+
 
     def dlg_help(self, *args, **vargs):
         if self._h_help == None:
