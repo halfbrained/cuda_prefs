@@ -95,6 +95,7 @@ VK_ENTER = 13
 VK_F = ord('F')
 VK_ESCAPE = 27
 LIST_SEP = chr(1)
+IS_WIN = os.name=='nt'
 
 BTN_H = app_proc(PROC_GET_GUI_HEIGHT, 'button')
 BTN_W = BTN_H*3
@@ -821,6 +822,7 @@ class DialogMK2:
         # Cancel #######
         n = dlg_proc(h, DLG_CTL_ADD, 'button_ex')
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
+                'name': 'btn_cancel',
                 'h': BTN_H, 'max_h': BTN_H,
                 'w': BTN_W, 'max_w': BTN_W,
                 'a_l': None, 'a_t': None, 'a_r': ('btn_apply', '['),  'a_b': ('', ']'),
@@ -838,6 +840,13 @@ class DialogMK2:
                 'cap': _('Help'),
                 'on_change': self.dlg_help,
                 })
+
+        # reverse buttons for Windows: [Cancel, Apply, OK] => [OK, Apply, Cancel]
+        if IS_WIN:
+            dlg_proc(h, DLG_CTL_PROP_SET, name='btn_cancel',    prop={'a_r': ('',           ']')})
+            dlg_proc(h, DLG_CTL_PROP_SET, name='btn_apply',     prop={'a_r': ('btn_cancel', '[')})
+            dlg_proc(h, DLG_CTL_PROP_SET, name='btn_ok',        prop={'a_r': ('btn_apply',  '[')})
+
 
         ### listbox
         listbox_proc(self._h_list, LISTBOX_SET_COLUMN_SEP, text=LIST_SEP)
