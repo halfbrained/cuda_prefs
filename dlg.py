@@ -234,6 +234,7 @@ def map_option_value(opt, val=None, caption=None):
             val, _cap = dct[ind]
             return val
 
+
         else:
             raise OptionMapValueError('require "val" or "caption"')
 
@@ -764,6 +765,16 @@ class DialogMK2:
         h_ed = dlg_proc(h, DLG_CTL_HANDLE, index=n)
         edt = Editor(h_ed)
 
+        n = dlg_proc(h, DLG_CTL_ADD, 'label')
+        dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
+                'name': 'mod_label',
+                'p': 'panel_value',
+                'a_t': ('scope', '-'),
+                'sp_r': PAD,
+                'cap': _('[mod]'),
+                'font_color': COL_FONT,
+                })
+
 
         ### SPLITTERS ###
         # list--opt_description
@@ -1042,6 +1053,8 @@ class DialogMK2:
             if prop_type == '#rgb'  or  prop_type == '#rgb-e':
                 self._update_rgb_edit()
 
+            self.toggle_mod_indicator(by_timer=True)
+
             key_code, key_state = data
             if key_code != VK_ENTER:
                 return
@@ -1073,6 +1086,7 @@ class DialogMK2:
             else: # canceled dialog
                 return
 
+        self.toggle_mod_indicator(show=True)
         self.add_opt_change(self._cur_opt_name, self.scope, val)
 
 
@@ -1102,6 +1116,7 @@ class DialogMK2:
                     ui_val = self.optman.value2uival(_opt, opt_change.value)
                     active_scoped_val = (opt_change.scope,  ui_val)
                     pass;       LOG and print('NOTE: using change value: '+str(opt_change))
+                    self.toggle_mod_indicator(show=True)
                     break
                 else: # unsetting option
                     removed_scopes.add(opt_change.scope)
@@ -1114,6 +1129,8 @@ class DialogMK2:
             active_scope_val = self.optman.get_opt_scope_value(self._cur_opt, active_scope, is_ui=True) # for UI
             active_scoped_val = (active_scope, active_scope_val)
             pass;       LOG and print(' *** using option value: {}; removed:{}'.format(active_scoped_val, removed_scopes))
+            self.toggle_mod_indicator(show=False)
+
 
         new_scope, _new_val = active_scoped_val
 
@@ -1144,9 +1161,11 @@ class DialogMK2:
         for opt_change in reversed(self._opt_changes):
             if opt_change.name == self._cur_opt_name  and  opt_change.scope == self.scope:
                 cur_scope_val = opt_change.value  or  ''
+                self.toggle_mod_indicator(show=True)
                 break
         else:
             cur_scope_val = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
+            self.toggle_mod_indicator(show=False)
 
         pass;       LOG and print(' -- scoped val:{}:[{}]'.format(self.scope, cur_scope_val))
 
@@ -1327,6 +1346,17 @@ class DialogMK2:
             for item_id,name in tree_proc(self._h_tree, TREE_ITEM_ENUM):
                 if name == TREE_ITEM_ALL:
                     tree_proc(self._h_tree, TREE_ITEM_SELECT, id_item=item_id)
+
+    def toggle_mod_indicator(self, tag='', info='', show=True, by_timer=False):
+        if by_timer:
+            timer_proc(TIMER_START_ONE, self.toggle_mod_indicator, 30, tag='ed_check_state')
+        else:
+            if tag == 'ed_check_state':
+                ed_line_state = self.val_eds.val_edit.get_prop(PROP_LINE_STATE, 0)
+                if ed_line_state == LINESTATE_NORMAL:
+                    return
+
+            dlg_proc(self.h, DLG_CTL_PROP_SET, name='mod_label', prop={'vis':show})
 
     def apply_changes(self, closing=False):
         """ batch apply qued option changes
@@ -1578,6 +1608,10 @@ class ValueEds:
             self.layout_ed_btn(h, n, _('Edit...'))
         #end if
 
+        # set line state: normal (not edited)
+        if type_wgt_name == M.WGT_NAME__EDIT:
+            self.val_edit.set_prop(PROP_LINE_STATE, (0, LINESTATE_NORMAL))
+
         self._current_type = newtype
 
     def clear_edits(self, h):
@@ -1631,7 +1665,7 @@ class ValueEds:
             'name': name,
             'p': M.VALUE_ED_PANEL,
             'h': BTN_H, 'max_h': BTN_H,
-            'a_l': ('', '['),
+            'a_l': ('mod_label', ']'),
             'a_t': (M.VALUE_ED_RESET, '['),
             'a_r': (M.VALUE_ED_RESET, '['),
             'a_b': (M.VALUE_ED_RESET, ']'),
@@ -1752,7 +1786,8 @@ class ValueEds:
         })
         # ... edit
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
-                'a_l': ('', '['),       'a_r': (M.WGT_NAME__BTN_EDIT, '[')
+                #'a_l': ('', '['),
+                'a_r': (M.WGT_NAME__BTN_EDIT, '[')
         })
 
     def update_ed_color(edt):
