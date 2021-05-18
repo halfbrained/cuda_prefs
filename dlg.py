@@ -1021,6 +1021,16 @@ class DialogMK2:
             if _old_val is None: # no chage - ignore
                 return
 
+        # if resetting value -- ask confirmation
+        scam = app_proc(PROC_GET_KEYSTATE, '')
+        if scam != 'c'  and  self.scope != 'f'  and  val is None:
+            _scope_cap = self._scope_captions[self.scope]
+            _jval = self.optman.get_opt_scope_value(self._cur_opt, scope=self.scope, is_ui=True)
+            _msg = _('Remove option [{}]\n   {} = {!r}\n?').format(_scope_cap,  self._cur_opt_name,  _jval)
+            res = msg_box(_msg, MB_OKCANCEL + MB_ICONQUESTION)
+            if res != ID_OK:
+                return
+
         lex = ed.get_prop(PROP_LEXER_FILE)  if scope == 'l' else None
         opt_change = OptChange(name,  scope,  val,  lexer=lex,  old_value=_old_val)
         pass;       LOG and print('NOTE: new option change: '+str(opt_change))
@@ -1107,16 +1117,17 @@ class DialogMK2:
         self.opt_comment_ed.set_text_all(self._cur_opt.get('cmt', ''))
 
         # if have a change for this option -- show it
+        is_opt_modified = False
         removed_scopes = set(self.hidden_scopes)
         for opt_change in reversed(self._opt_changes):
             if opt_change.name == self._cur_opt_name:
+                is_opt_modified = True
                 if opt_change.value is not None:  # setting value
                     # (scope, val) - [f],[l],[u], [def]
                     _opt = self.optman.get_opt(opt_change.name)
                     ui_val = self.optman.value2uival(_opt, opt_change.value)
                     active_scoped_val = (opt_change.scope,  ui_val)
                     pass;       LOG and print('NOTE: using change value: '+str(opt_change))
-                    self.toggle_mod_indicator(show=True)
                     break
                 else: # unsetting option
                     removed_scopes.add(opt_change.scope)
@@ -1129,8 +1140,8 @@ class DialogMK2:
             active_scope_val = self.optman.get_opt_scope_value(self._cur_opt, active_scope, is_ui=True) # for UI
             active_scoped_val = (active_scope, active_scope_val)
             pass;       LOG and print(' *** using option value: {}; removed:{}'.format(active_scoped_val, removed_scopes))
-            self.toggle_mod_indicator(show=False)
 
+        self.toggle_mod_indicator(show=is_opt_modified)
 
         new_scope, _new_val = active_scoped_val
 
