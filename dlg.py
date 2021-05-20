@@ -624,6 +624,7 @@ class DialogMK2:
         dlg_proc(h, DLG_PROP_SET, prop={
                 'cap': self.title,
                 'w': 600, 'h': 400,
+                'w_min': 550, 'h_min': 250,
                 'border': DBORDER_SIZE,
                 'color': color_form_bg,
                 #'on_mouse_exit': self.dlgcolor_mouse_exit,
@@ -1272,7 +1273,7 @@ class DialogMK2:
                 menu_proc(self._h_col_menu, MENU_ADD, caption='-')
 
                 la = lambda: self.configure_columns()
-                menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=_('Configure'))
+                menu_proc(self._h_col_menu, MENU_ADD, command=la, caption=_('Configure...'))
             #end if
 
 
