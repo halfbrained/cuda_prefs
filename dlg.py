@@ -560,6 +560,7 @@ class DialogMK2:
         nitems = self._fill_tree(self.optman.tree['kids'])
         if nitems <= 1:
             dlg_proc(self.h, DLG_CTL_PROP_SET, name='category_tree', prop={'vis': False})
+            dlg_proc(self.h, DLG_CTL_PROP_SET, name='splitter_left', prop={'vis': False})
 
         self.update_list_layout()
 
@@ -793,6 +794,7 @@ class DialogMK2:
         # tree--list
         n = dlg_proc(h, DLG_CTL_ADD, 'splitter')
         dlg_proc(h, DLG_CTL_PROP_SET, index=n, prop={
+                'name': 'splitter_left',
                 'p': 'panel_main',
                 'align': ALIGN_LEFT,
                 'x': 100, 'y': 0, 'w': 4,
