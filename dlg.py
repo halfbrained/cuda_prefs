@@ -557,7 +557,9 @@ class DialogMK2:
         if not self.h:
             self.h, self.opt_comment_ed = self.init_form()
 
-        self._fill_tree(self.optman.tree['kids'])
+        nitems = self._fill_tree(self.optman.tree['kids'])
+        if nitems <= 1:
+            dlg_proc(self.h, DLG_CTL_PROP_SET, name='category_tree', prop={'vis': False})
 
         self.update_list_layout()
 
@@ -1053,15 +1055,17 @@ class DialogMK2:
     def _fill_tree(self, d, parent=0):
         if parent == 0:
             item_id = tree_proc(self._h_tree, TREE_ITEM_ADD, text=TREE_ITEM_ALL)
-
+        n = 0
         for name,d_ in d.items():
             # add item
             item_id = tree_proc(self._h_tree, TREE_ITEM_ADD, id_item=parent, index=-1, text=name)
             d_['item_id'] = item_id
+            n += 1
 
             items = d_.get('kids')
             if items:
-                self._fill_tree(items, parent=item_id)
+                n += self._fill_tree(items, parent=item_id)
+        return n
 
 
     def on_opt_val_edit(self, id_dlg, id_ctl, data='', info=''):
