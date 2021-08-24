@@ -671,6 +671,7 @@ class DialogMK2:
                 'p': 'panel_right',
                 'align': ALIGN_BOTTOM,
                 'h': 120,
+                'h_min': 70,
                 'sp_t': PAD,
                 })
         # scope combo ##########
